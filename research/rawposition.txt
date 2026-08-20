@@ -1,0 +1,24 @@
+=== POSITION RECEIVED ===
+{'from': 4038397016, 'to': 4294967295, 'decoded': {'portnum': 'POSITION_APP', 'payload': b'\r\x00\x00\x1c\x16\x15\x00\x00d\xc8%\x8d\x8a\x86j(\x03H\x00\x98\x01\x0c\xb8\x01\r', 'bitfield': 0, 'position': {'latitudeI': 370933760, 'longitudeI': -932970496, 'time': 1787202189, 'locationSource': 'LOC_EXTERNAL', 'altitudeHae': 0, 'satsInView': 12, 'precisionBits': 13, 'raw': latitude_i: 370933760
+longitude_i: -932970496
+time: 1787202189
+location_source: LOC_EXTERNAL
+altitude_hae: 0
+sats_in_view: 12
+precision_bits: 13
+, 'latitude': 37.093376, 'longitude': -93.2970496}}, 'id': 4196978162, 'rxTime': 1787202292, 'rxSnr': -16.0, 'hopLimit': 7, 'rxRssi': -117, 'hopStart': 7, 'relayNode': 88, 'transportMechanism': 'TRANSPORT_LORA', 'raw': from: 4038397016
+to: 4294967295
+decoded {
+  portnum: POSITION_APP
+  payload: "\r\000\000\034\026\025\000\000d\310%\215\212\206j(\003H\000\230\001\014\270\001\r"
+  bitfield: 0
+}
+id: 4196978162
+rx_time: 1787202292
+rx_snr: -16
+hop_limit: 7
+rx_rssi: -117
+hop_start: 7
+relay_node: 88
+transport_mechanism: TRANSPORT_LORA
+, 'fromId': '!f0b50c58', 'toId': '^all'}

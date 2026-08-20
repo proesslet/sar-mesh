@@ -1,0 +1,26 @@
+[project]
+name = "sarmesh"
+version = "0.1.0"
+description = "Offline search and rescue personnel tracking over mesh radio networks"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "meshtastic",
+]
+
+[project.scripts]
+sarmesh = "sarmesh.main:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/sarmesh"]
+
+[dependency-groups]
+dev = [
+    "mypy>=2.3.1",
+    "pytest>=9.1.1",
+    "ruff>=0.16.3",
+]
