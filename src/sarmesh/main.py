@@ -1,13 +1,18 @@
 from sarmesh.transports.meshtastic import MeshtasticTransport
 from sarmesh.core.registry import TrackerRegistry
+from sarmesh.storage.database import Database
 
 
 
 def main() -> None:
     registry = TrackerRegistry()
+    database = Database("positions.db")
+    database.initialize()
 
     def handle_position(position) -> None:
         registry.update(position)
+        database.save_position(position)
+
 
         print("\nKnown Trackers:")
         for tracker in registry.all():
