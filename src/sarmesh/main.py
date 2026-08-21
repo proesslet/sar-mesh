@@ -1,27 +1,21 @@
+from datetime import datetime, timezone
+
 from sarmesh.transports.meshtastic import MeshtasticTransport
 from sarmesh.core.registry import TrackerRegistry
 from sarmesh.storage.database import Database
+from sarmesh.services.tracking import TrackingService
+from sarmesh.core.models import Incident
 
 
 
 def main() -> None:
-    registry = TrackerRegistry()
-    database = Database("positions.db")
+    database = Database("sarmesh.db")
     database.initialize()
 
-    def handle_position(position) -> None:
-        registry.update(position)
-        database.save_position(position)
 
+    registry = TrackerRegistry()
+    
+    tracking_service = TrackingService(registry=registry, database=database)
 
-        print("\nKnown Trackers:")
-        for tracker in registry.all():
-            print(
-                tracker.node_id,
-                tracker.latitude,
-                tracker.longitude,
-                tracker.received_at,
-            )
-
-    transport = MeshtasticTransport(handle_position)
+    transport = MeshtasticTransport(on_position=tracking_service.handle_position)
     transport.run()
