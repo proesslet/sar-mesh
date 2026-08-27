@@ -20,6 +20,7 @@ def get_database() -> Database:
     database.initialize()
     return database
 
+
 @incident_app.command("create")
 def create_incident(
     name: str,
@@ -28,9 +29,8 @@ def create_incident(
 
     incident = database.create_incident(name=name)
 
-    typer.echo(
-        f"Created incident {incident.id}: {incident.name}"
-    )
+    typer.echo(f"Created incident {incident.id}: {incident.name}")
+
 
 @team_app.command("create")
 def create_team(
@@ -49,9 +49,8 @@ def create_team(
         personnel_count=personnel,
     )
 
-    typer.echo(
-        f"Created team {team.id}: {team.name}"
-    )
+    typer.echo(f"Created team {team.id}: {team.name}")
+
 
 @tracker_app.command("add")
 def add_tracker(
@@ -65,9 +64,8 @@ def add_tracker(
         label=label,
     )
 
-    typer.echo(
-        f"Added tracker {tracker.label} ({tracker.node_id})"
-    )
+    typer.echo(f"Added tracker {tracker.label} ({tracker.node_id})")
+
 
 @tracker_app.command("assign")
 def assign_tracker(
@@ -83,7 +81,23 @@ def assign_tracker(
         team_id=team_id,
     )
 
-    typer.echo(
-        f"Assigned {node_id} to team {team_id} "
-        f"for incident {incident_id}"
+    typer.echo(f"Assigned {node_id} to team {team_id} for incident {incident_id}")
+
+
+@app.command("run")
+def run() -> None:
+    from sarmesh.core.registry import TrackerRegistry
+    from sarmesh.services.tracking import TrackingService
+    from sarmesh.transports.meshtastic import MeshtasticTransport
+
+    database = get_database()
+    registry = TrackerRegistry()
+    tracking_service = TrackingService(
+        registry=registry,
+        database=database,
     )
+
+    transport = MeshtasticTransport(
+        on_position=tracking_service.handle_position,
+    )
+    transport.run()

@@ -1,10 +1,11 @@
-from datetime import datetime, timezone
 import time
+from datetime import UTC, datetime
 
 import meshtastic.serial_interface
 from pubsub import pub
 
 from sarmesh.core.models import TrackerPosition
+
 
 class MeshtasticTransport:
     def __init__(self, on_position) -> None:
@@ -39,21 +40,21 @@ class MeshtasticTransport:
             self.interface.close()
 
     def _on_position(self, packet, interface) -> None:
-            position = packet["decoded"]["position"]
-    
-            tracker_position = TrackerPosition(
-                node_id=packet["fromId"],
-                node_num=packet["from"],
-                latitude=position["latitude"],
-                longitude=position["longitude"],
-                received_at=datetime.fromtimestamp(
-                    packet["rxTime"],
-                    tz=timezone.utc,
-                ),
-                satellites=position.get("satsInView"), 
-                precision_bits=position.get("precisionBits"),
-                rssi=packet.get("rxRssi"),
-                snr=packet.get("rxSnr")
-            )
-    
-            self.on_position(tracker_position)
+        position = packet["decoded"]["position"]
+
+        tracker_position = TrackerPosition(
+            node_id=packet["fromId"],
+            node_num=packet["from"],
+            latitude=position["latitude"],
+            longitude=position["longitude"],
+            received_at=datetime.fromtimestamp(
+                packet["rxTime"],
+                tz=UTC,
+            ),
+            satellites=position.get("satsInView"),
+            precision_bits=position.get("precisionBits"),
+            rssi=packet.get("rxRssi"),
+            snr=packet.get("rxSnr"),
+        )
+
+        self.on_position(tracker_position)

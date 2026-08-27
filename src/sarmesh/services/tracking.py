@@ -15,9 +15,7 @@ class TrackingService:
     def handle_position(self, position: TrackerPosition) -> None:
         self.registry.update(position)
 
-        assignment = self.database.get_active_assignment(
-            position.node_id
-        )
+        assignment = self.database.get_active_assignment(position.node_id)
 
         incident_id = None
 

@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from datetime import datetime
 
+
 @dataclass
 class TrackerPosition:
     node_id: str
@@ -14,12 +15,14 @@ class TrackerPosition:
     rssi: int | None = None
     snr: float | None = None
 
+
 @dataclass
 class Incident:
     id: str
     name: str
     started_at: datetime
     ended_at: datetime | None = None
+
 
 @dataclass
 class Tracker:
@@ -41,3 +44,11 @@ class TrackerAssignment:
     team_id: str
     assigned_at: datetime
     unassigned_at: datetime | None = None
+
+
+@dataclass
+class TrackerStatus:
+    tracker: Tracker
+    team: Team | None
+    position: TrackerPosition | None
+    last_seen_at: datetime | None
