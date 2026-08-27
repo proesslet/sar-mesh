@@ -1,4 +1,7 @@
 import sqlite3
+import threading
+from collections.abc import Generator
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
@@ -16,11 +19,38 @@ from sarmesh.core.models import (
 class Database:
     def __init__(self, path: Path) -> None:
         self.path = path
+        self._connection: sqlite3.Connection | None = None
+        self._lock = threading.RLock()
+
+    ########################## Connection Management ##########################
+
+    def connect(self) -> sqlite3.Connection:
+        if self._connection is None:
+            # Positions are delivered on the Meshtastic "publishing" thread
+            # while the main thread owns the CLI, so the connection is shared
+            # across threads and serialised by self._lock instead.
+            self._connection = sqlite3.connect(self.path, check_same_thread=False)
+        return self._connection
+
+    @contextmanager
+    def _transaction(self) -> Generator[sqlite3.Connection, None, None]:
+        # Reentrant so composite reads (get_tracker_status) can call the
+        # single-entity methods without deadlocking on themselves.
+        with self._lock:
+            connection = self.connect()
+            with connection:
+                yield connection
+
+    def close(self) -> None:
+        with self._lock:
+            if self._connection is not None:
+                self._connection.close()
+                self._connection = None
 
     ########################## Database Initialization ##########################
 
     def initialize(self) -> None:
-        with sqlite3.connect(self.path) as connection:
+        with self._transaction() as connection:
             connection.executescript(
                 """
                 CREATE TABLE IF NOT EXISTS positions (
@@ -75,7 +105,7 @@ class Database:
             started_at=datetime.now(UTC),
         )
 
-        with sqlite3.connect(self.path) as connection:
+        with self._transaction() as connection:
             connection.execute(
                 """
                 INSERT INTO incidents (id, name, started_at, ended_at)
@@ -91,7 +121,7 @@ class Database:
         return incident
 
     def get_incident(self, incident_id: str) -> Incident | None:
-        with sqlite3.connect(self.path) as connection:
+        with self._transaction() as connection:
             cursor = connection.execute(
                 """
                 SELECT * FROM incidents WHERE id = ?
@@ -109,7 +139,7 @@ class Database:
             return None
 
     def get_all_incidents(self) -> list[Incident]:
-        with sqlite3.connect(self.path) as connection:
+        with self._transaction() as connection:
             cursor = connection.execute(
                 """
                 SELECT * FROM incidents
@@ -128,7 +158,7 @@ class Database:
             return incidents
 
     def get_active_incident(self) -> Incident | None:
-        with sqlite3.connect(self.path) as connection:
+        with self._transaction() as connection:
             cursor = connection.execute(
                 """
                 SELECT * FROM incidents WHERE ended_at IS NULL ORDER BY started_at DESC LIMIT 1
@@ -145,7 +175,7 @@ class Database:
             return None
 
     def end_incident(self, incident_id: str, ended_at: datetime) -> None:
-        with sqlite3.connect(self.path) as connection:
+        with self._transaction() as connection:
             connection.execute(
                 """
                 UPDATE incidents
@@ -163,7 +193,7 @@ class Database:
             name=name,
             personnel_count=personnel_count,
         )
-        with sqlite3.connect(self.path) as connection:
+        with self._transaction() as connection:
             connection.execute(
                 """
                 INSERT INTO teams (id, name, personnel_count)
@@ -174,7 +204,7 @@ class Database:
         return team
 
     def get_team(self, team_id: str) -> Team | None:
-        with sqlite3.connect(self.path) as connection:
+        with self._transaction() as connection:
             cursor = connection.execute(
                 """
                 SELECT * FROM teams WHERE id = ?
@@ -191,7 +221,7 @@ class Database:
             return None
 
     def get_all_teams(self) -> list[Team]:
-        with sqlite3.connect(self.path) as connection:
+        with self._transaction() as connection:
             cursor = connection.execute(
                 """
                 SELECT * FROM teams
@@ -211,7 +241,7 @@ class Database:
     def update_team(
         self, team_id: str, name: str | None = None, personnel_count: int | None = None
     ) -> Team | None:
-        with sqlite3.connect(self.path) as connection:
+        with self._transaction() as connection:
             if name is not None:
                 connection.execute(
                     """
@@ -233,7 +263,7 @@ class Database:
         return self.get_team(team_id)
 
     def delete_team(self, team_id: str) -> None:
-        with sqlite3.connect(self.path) as connection:
+        with self._transaction() as connection:
             connection.execute(
                 """
                 DELETE FROM teams WHERE id = ?
@@ -249,7 +279,7 @@ class Database:
             label=label,
         )
 
-        with sqlite3.connect(self.path) as connection:
+        with self._transaction() as connection:
             connection.execute(
                 """
                 INSERT INTO trackers (node_id, label)
@@ -261,7 +291,7 @@ class Database:
         return tracker
 
     def get_tracker(self, node_id: str) -> Tracker | None:
-        with sqlite3.connect(self.path) as connection:
+        with self._transaction() as connection:
             cursor = connection.execute(
                 """
                 SELECT * FROM trackers WHERE node_id = ?
@@ -277,7 +307,7 @@ class Database:
             return None
 
     def get_all_trackers(self) -> list[Tracker]:
-        with sqlite3.connect(self.path) as connection:
+        with self._transaction() as connection:
             cursor = connection.execute(
                 """
                 SELECT * FROM trackers
@@ -294,7 +324,7 @@ class Database:
             return trackers
 
     def update_tracker(self, node_id: str, label: str) -> Tracker | None:
-        with sqlite3.connect(self.path) as connection:
+        with self._transaction() as connection:
             connection.execute(
                 """
                 UPDATE trackers
@@ -306,7 +336,7 @@ class Database:
         return self.get_tracker(node_id)
 
     def delete_tracker(self, node_id: str) -> None:
-        with sqlite3.connect(self.path) as connection:
+        with self._transaction() as connection:
             connection.execute(
                 """
                 DELETE FROM trackers WHERE node_id = ?
@@ -325,7 +355,7 @@ class Database:
             team_id=team_id,
             assigned_at=datetime.now(UTC),
         )
-        with sqlite3.connect(self.path) as connection:
+        with self._transaction() as connection:
             connection.execute(
                 """
                 INSERT INTO tracker_assignments (incident_id, tracker_node_id, team_id, assigned_at, unassigned_at)
@@ -342,7 +372,7 @@ class Database:
         return assignment
 
     def get_active_assignment(self, tracker_node_id: str) -> TrackerAssignment | None:
-        with sqlite3.connect(self.path) as connection:
+        with self._transaction() as connection:
             cursor = connection.execute(
                 """
                 SELECT * FROM tracker_assignments
@@ -362,7 +392,7 @@ class Database:
             return None
 
     def get_assignments_for_incident(self, incident_id: str) -> list[TrackerAssignment]:
-        with sqlite3.connect(self.path) as connection:
+        with self._transaction() as connection:
             cursor = connection.execute(
                 """
                 SELECT * FROM tracker_assignments
@@ -383,7 +413,7 @@ class Database:
             ]
 
     def unassign_tracker(self, tracker_node_id: str, unassigned_at: datetime) -> None:
-        with sqlite3.connect(self.path) as connection:
+        with self._transaction() as connection:
             connection.execute(
                 """
                 UPDATE tracker_assignments
@@ -398,7 +428,7 @@ class Database:
     def save_position(
         self, position: TrackerPosition, incident_id: str | None = None
     ) -> None:
-        with sqlite3.connect(self.path) as connection:
+        with self._transaction() as connection:
             connection.execute(
                 """
                 INSERT INTO positions (
@@ -432,7 +462,7 @@ class Database:
     def get_latest_position(
         self, tracker_node_id: str, incident_id: str | None = None
     ) -> TrackerPosition | None:
-        with sqlite3.connect(self.path) as connection:
+        with self._transaction() as connection:
             if incident_id is None:
                 cursor = connection.execute(
                     """
@@ -469,7 +499,7 @@ class Database:
             return None
 
     def list_latest_positions(self) -> list[TrackerPosition]:
-        with sqlite3.connect(self.path) as connection:
+        with self._transaction() as connection:
             cursor = connection.execute(
                 """
                 SELECT * FROM positions p1

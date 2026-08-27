@@ -85,7 +85,19 @@ def assign_tracker(
 
 
 @app.command("run")
-def run() -> None:
+def run(
+    host: str | None = typer.Option(
+        None,
+        "--host",
+        "-H",
+        help="Reach the node over TCP instead of USB serial",
+    ),
+    port: int | None = typer.Option(
+        None,
+        "--port",
+        help="TCP port for --host (default 4403)",
+    ),
+) -> None:
     from sarmesh.core.registry import TrackerRegistry
     from sarmesh.services.tracking import TrackingService
     from sarmesh.transports.meshtastic import MeshtasticTransport
@@ -99,5 +111,14 @@ def run() -> None:
 
     transport = MeshtasticTransport(
         on_position=tracking_service.handle_position,
+        host=host,
+        port=port,
     )
-    transport.run()
+
+    try:
+        transport.run()
+    except ConnectionError as error:
+        typer.echo(f"Error: {error}", err=True)
+        raise typer.Exit(1) from error
+    finally:
+        database.close()

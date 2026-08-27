@@ -78,8 +78,18 @@ uv run sarmesh tracker assign '!f0b50c58' <team-id> <incident-id>
 uv run sarmesh run
 ```
 
-Connects to the local Meshtastic node and logs every position it hears until
-`Ctrl-C`.
+Connects to the Meshtastic node attached over USB and logs every position it
+hears until `Ctrl-C`. To reach a node over the network instead:
+
+```bash
+uv run sarmesh run --host 192.168.1.50     # --port defaults to 4403
+```
+
+If no node can be reached, `run` exits with an error rather than starting.
+Note that the `meshtastic` library prints "No Serial Meshtastic device
+detected, attempting TCP connection on localhost" when probing finds no serial
+port — despite the wording it does **not** attempt that connection, so use
+`--host` explicitly.
 
 ## Data model
 
