@@ -15,16 +15,16 @@ from sarmesh.services.tracking import TrackingService
 from sarmesh.storage.database import Database
 from sarmesh.storage.paths import basemap_dir
 from sarmesh.transports.meshtastic import MeshtasticTransport
-from sarmesh.web.server import BASEMAP_SETTING, create_app
-from sarmesh.web.tiles import BasemapLibrary
+from sarmesh.web.server import create_app
+from sarmesh.web.tiles import BASEMAP_SETTING, BasemapLibrary
 
 QT_HINT = """
 The desktop window needs PySide6, which bundles its own rendering engine:
 
     uv sync
 
-On Raspberry Pi this requires Pi OS Trixie or newer -- the ARM wheels need
-glibc 2.39, and Bookworm ships 2.36.
+On Raspberry Pi this needs Pi OS Trixie or newer, since the ARM wheels want
+glibc 2.39 and Bookworm ships 2.36.
 """
 
 # What the app uses when no port is asked for. Also what the Vite dev server
@@ -40,9 +40,9 @@ def _listen(host: str, port: int) -> socket.socket:
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
     if sys.platform != "win32":
-        # Lets a restart rebind a port still in TIME_WAIT. Deliberately not set
-        # on Windows, where SO_REUSEADDR permits binding over a live listener --
-        # it would silently steal the port instead of reporting the clash.
+        # Lets a restart rebind a port still in TIME_WAIT. Deliberately not
+        # set on Windows, where SO_REUSEADDR permits binding over a live
+        # listener: it would steal the port instead of reporting the clash.
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
     try:
@@ -58,9 +58,9 @@ class DesktopApp:
     """Runs the HTTP server, the radio listener, and the desktop window.
 
     Three things need threads here: uvicorn's event loop, the Meshtastic
-    reader, and the native window. The window must own the main thread --
-    macOS and GTK both require their UI loop to run there -- so the server
-    and the radio go to background threads.
+    reader, and the native window. The window must own the main thread, since
+    macOS and GTK both require their UI loop to run there, so the server and
+    the radio go to background threads.
     """
 
     def __init__(
@@ -83,7 +83,7 @@ class DesktopApp:
         self.radio_port = radio_port
 
         self.database = Database(database_path)
-        self.database.initialize()
+        self.database.migrate()
 
         self.broadcaster = PositionBroadcaster()
         self.tracking_service = TrackingService(
@@ -95,7 +95,7 @@ class DesktopApp:
         # session is restored, so a map picked in settings is still there after
         # a restart.
         self.basemaps = BasemapLibrary(basemap_dir(), pinned=basemap)
-        self.basemaps.select_default(self.database.get_setting(BASEMAP_SETTING))
+        self.basemaps.select_default(self.database.settings.get(BASEMAP_SETTING))
 
         self.downloader = BasemapDownloader()
         self.transport: MeshtasticTransport | None = None
@@ -111,10 +111,9 @@ class DesktopApp:
 
     def _bind(self) -> socket.socket:
         """Claim the port to serve on, before anything is told the URL."""
-        # An explicit --http-port is a promise made to something else -- the
-        # Vite dev proxy, a bookmark, another device on the network -- so a
-        # clash there has to be reported. With no port requested a clash is not
-        # worth failing over: the window is handed the URL either way.
+        # An explicit --http-port was promised to something else (the Vite dev
+        # proxy, a bookmark), so a clash there is an error. Without one, any
+        # free port will do: the window is handed the URL either way.
         if self.requested_port is not None:
             return _listen(self.host, self.requested_port)
 
@@ -137,8 +136,8 @@ class DesktopApp:
         try:
             transport.start()
         except ConnectionError as error:
-            # A missing radio must not take the UI down with it -- an operator
-            # still needs to read the last known positions and manage teams.
+            # A missing radio must not take the UI down. An operator still
+            # needs the last known positions and the team lists.
             logger.warning(
                 "Radio unavailable, running without live positions: %s", error
             )
@@ -186,7 +185,7 @@ class DesktopApp:
             sock.close()
             raise ConnectionError(f"The UI server did not start on {self.url}")
 
-        # A packaged build no longer writes beside the executable, so say where
+        # A packaged build does not write beside the executable, so say where
         # the incident data actually lives.
         logger.info("Database: %s", self.database.path)
         logger.info("SARMesh serving at %s", self.url)
@@ -226,7 +225,7 @@ class DesktopApp:
         try:
             from sarmesh.desktop import run_window
         except ImportError as error:
-            # Qt missing entirely -- fall back rather than exit, so an operator
+            # Qt missing entirely. Fall back rather than exit, so an operator
             # keeps access to stored positions.
             logger.error("Native window unavailable: %s", error)
             logger.info(QT_HINT)

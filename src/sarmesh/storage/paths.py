@@ -1,16 +1,10 @@
 """Where SARMesh keeps its data on disk.
 
-A packaged app is launched by double-clicking, so its working directory is
-whatever the OS happened to hand it -- the filesystem root for a macOS .app
-bundle, the shortcut's target on Windows. Resolving the database against that
-would scatter incident data across directories, or fail outright on a
-read-only path, so a frozen build writes to the per-user data directory
-instead. Running from source keeps the working directory, which is what a
-development checkout wants.
-
-SARMESH_DB overrides both. It is the way to point a build at a specific
-database -- an incident kept on removable media, say -- and because every
-command reads it, the CLI and the app stay in agreement.
+A double-clicked bundle inherits a useless working directory: the filesystem
+root on macOS, the shortcut's target on Windows. A frozen build therefore
+writes to the per-user data directory, while a source checkout keeps the cwd.
+SARMESH_DB overrides both, which is how a build is pointed at an incident
+database on removable media.
 """
 
 import os
@@ -63,11 +57,9 @@ def default_database_path() -> Path:
 def log_path() -> Path:
     """Where diagnostics are written.
 
-    Unlike the database this is always the user data directory, source checkout
-    included. A log is a diagnostic rather than incident data, and the one
-    question it has to answer -- "the app did not start, why?" -- is easiest to
-    answer when the file is in a fixed place instead of wherever the app
-    happened to be launched from.
+    Always the user data directory, source checkout included. The question a
+    log has to answer is "the app did not start, why?", which is easiest when
+    the file is in one fixed place.
     """
     return user_data_dir() / LOG_NAME
 

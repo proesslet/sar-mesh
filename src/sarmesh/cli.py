@@ -27,7 +27,7 @@ app.add_typer(tracker_app, name="tracker")
 
 def get_database() -> Database:
     database = Database(default_database_path())
-    database.initialize()
+    database.migrate()
     return database
 
 
@@ -37,7 +37,7 @@ def create_incident(
 ) -> None:
     database = get_database()
 
-    incident = database.create_incident(name=name)
+    incident = database.incidents.create(name=name)
 
     typer.echo(f"Created incident {incident.id}: {incident.name}")
 
@@ -54,7 +54,7 @@ def create_team(
 ) -> None:
     database = get_database()
 
-    team = database.create_team(
+    team = database.teams.create(
         name=name,
         personnel_count=personnel,
     )
@@ -69,7 +69,7 @@ def add_tracker(
 ) -> None:
     database = get_database()
 
-    tracker = database.create_tracker(
+    tracker = database.trackers.create(
         node_id=node_id,
         label=label,
     )
@@ -85,7 +85,7 @@ def assign_tracker(
 ) -> None:
     database = get_database()
 
-    database.assign_tracker(
+    database.assignments.create(
         incident_id=incident_id,
         tracker_node_id=node_id,
         team_id=team_id,
@@ -148,8 +148,6 @@ def desktop_app(
     try:
         desktop.run(window=not browser)
     except ConnectionError as error:
-        # Reported rather than printed: a double-clicked bundle has no console
-        # to print to, so this is the only way the operator learns anything.
         report_fatal_error(str(error))
         raise typer.Exit(1) from error
 

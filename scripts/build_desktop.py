@@ -34,7 +34,7 @@ def build_frontend() -> None:
     if npm is None:
         raise SystemExit(
             "npm not found. Node is needed to build the UI, but only on this "
-            "build machine -- it is not required to run the packaged app."
+            "build machine. It is not required to run the packaged app."
         )
 
     if not (FRONTEND / "node_modules").is_dir():

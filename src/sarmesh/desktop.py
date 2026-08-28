@@ -14,7 +14,7 @@ class MainWindow(QMainWindow):
 
     The UI is loaded over the local HTTP server rather than from file:// so
     that the API, the SSE position stream, and the tile endpoint all share one
-    origin -- and so the same build can be viewed from another device on the
+    origin, and so the same build can be viewed from another device on the
     network without a second code path.
     """
 

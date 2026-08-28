@@ -17,8 +17,8 @@ from sarmesh.storage.paths import is_frozen, log_path
 
 LOG_FORMAT = "%(asctime)s %(levelname)-7s %(name)s: %(message)s"
 
-# An incident can run for days on a Pi. Three 1 MB files keep the tail of a
-# long deployment without ever growing without bound on an SD card.
+# Four 1 MB files (the active log plus three backups): enough tail for a
+# multi-day deployment, and bounded on an SD card.
 MAX_BYTES = 1_000_000
 BACKUP_COUNT = 3
 

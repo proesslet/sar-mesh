@@ -36,10 +36,10 @@ class MeshtasticTransport:
     def start(self) -> None:
         logger.info("Starting Meshtastic transport...")
 
-        pub.subscribe(
-            self._on_position,
-            POSITION_TOPIC,
-        )
+        # pubsub holds listeners weakly, so positions keep arriving only while
+        # something else holds a reference to this transport. Drop it and the
+        # stream stops silently, with no error anywhere.
+        pub.subscribe(self._on_position, POSITION_TOPIC)
 
         if self.host is not None:
             interface = self._connect_tcp()
@@ -57,7 +57,7 @@ class MeshtasticTransport:
 
         # With no serial device attached, SerialInterface.__init__ prints a
         # message about falling back to TCP and returns early without ever
-        # calling StreamInterface.__init__ -- it does not actually make that
+        # calling StreamInterface.__init__. It does not actually make that
         # TCP connection; the library's own CLI does it separately. The object
         # it hands back has no reader thread and silently receives nothing, so
         # refuse it rather than reporting a connection we do not have.

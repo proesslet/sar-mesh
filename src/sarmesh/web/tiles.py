@@ -6,9 +6,13 @@ from pathlib import Path
 
 MBTILES_SUFFIX = ".mbtiles"
 
-# Written to a temporary name and renamed into place, so an interrupted import
-# never leaves a half-written file looking like a usable pack.
+# Extension for a pack still being written. Importers rename into place once the
+# file is complete, so a half-written pack is never mistaken for a usable one.
 PARTIAL_SUFFIX = ".partial"
+
+# The settings key holding the active pack's name, so a map chosen in the UI is
+# still serving after a restart. Read at startup, written by the basemap routes.
+BASEMAP_SETTING = "basemap"
 
 logger = logging.getLogger(__name__)
 
@@ -81,7 +85,7 @@ class BasemapPack:
     name: str
     path: Path
     size_bytes: int
-    # None when the file is not a readable MBTiles pack -- it is still listed,
+    # None when the file is not a readable MBTiles pack. It is still listed,
     # because a corrupt or truncated download is something the operator needs
     # to see rather than something that should silently vanish from the list.
     metadata: dict[str, str] | None
@@ -111,8 +115,6 @@ class BasemapLibrary:
         # Tile URLs are otherwise identical between packs, and the browser
         # would keep serving the previous pack's tiles from cache.
         self._revision = 0
-
-    ########################## Enumeration ##########################
 
     def packs(self) -> list[BasemapPack]:
         found: dict[str, BasemapPack] = {}
@@ -147,8 +149,6 @@ class BasemapLibrary:
         with self._lock:
             return self._store
 
-    ########################## Selection ##########################
-
     def select(self, name: str | None) -> None:
         """Serve tiles from the named pack, or from none at all.
 
@@ -182,8 +182,8 @@ class BasemapLibrary:
     def select_default(self, saved: str | None) -> None:
         """Choose what to serve at startup.
 
-        An explicit --basemap wins, because it was asked for on this run. Then
-        the pack chosen in a previous session, if it is still there -- a pack
+        An explicit --basemap wins, because it was asked for on this run, then
+        the pack chosen in a previous session if it is still there. A pack
         deleted between runs must not stop the app from starting.
         """
         if self.pinned is not None and self.pinned.is_file():
@@ -196,8 +196,6 @@ class BasemapLibrary:
 
         if saved is not None:
             logger.warning("Previously selected basemap %s is missing", saved)
-
-    ########################## Import ##########################
 
     def import_path(self, name: str) -> Path:
         """Where an uploaded pack of this name should be written.

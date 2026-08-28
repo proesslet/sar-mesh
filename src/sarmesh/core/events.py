@@ -11,8 +11,8 @@ class PositionBroadcaster:
 
     Positions are published by the Meshtastic "publishing" thread, while
     subscribers live on the server's asyncio loop. Every hand-off therefore
-    goes through call_soon_threadsafe -- asyncio.Queue is not itself thread
-    safe, so publishing into one directly would corrupt it under load.
+    goes through call_soon_threadsafe. asyncio.Queue is not thread safe, so
+    publishing into one directly would corrupt it under load.
     """
 
     def __init__(self) -> None:

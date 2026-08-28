@@ -16,14 +16,14 @@ class TrackingService:
 
     def handle_position(self, position: TrackerPosition) -> None:
 
-        assignment = self.database.get_active_assignment(position.node_id)
+        assignment = self.database.assignments.active_for(position.node_id)
 
         incident_id = None
 
         if assignment is not None:
             incident_id = assignment.incident_id
 
-        self.database.save_position(
+        self.database.positions.save(
             position,
             incident_id=incident_id,
         )

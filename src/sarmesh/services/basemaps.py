@@ -1,8 +1,8 @@
 """Building an offline basemap pack by fetching tiles from a tile server.
 
 The tile source is supplied by the operator rather than built in. There is no
-universal server a search team may hammer -- OpenStreetMap's tile policy
-prohibits bulk downloading outright -- so the URL template belongs to whoever
+universal server a search team may hammer, and OpenStreetMap's tile policy
+prohibits bulk downloading outright, so the URL template belongs to whoever
 is running the search and has the right to fetch from it.
 
 Downloads run on a worker pool because a pack is thousands of small requests,
@@ -95,10 +95,6 @@ class DownloadProgress:
     last_error: str | None = None
 
     @property
-    def attempted(self) -> int:
-        return self.completed + self.failed
-
-    @property
     def finished(self) -> bool:
         return self.state != "running"
 
@@ -183,12 +179,12 @@ def validate_template(template: str) -> None:
     # unexpanded one parses as a host that could never resolve.
     scheme = urlparse(expand_template(template, 0, 0, 0)).scheme.lower()
 
-    # Anything else -- file:, ftp: -- is either not fetchable or is a way to
+    # Anything else (file:, ftp:) is either not fetchable or is a way to
     # read the local disk through a field the operator typed into.
     if scheme not in ("http", "https"):
         raise ValueError("The tile URL must be an http:// or https:// address")
 
-    # A placeholder we do not substitute -- {apikey}, {quadkey}, a typo -- would
+    # A placeholder we do not substitute ({apikey}, {quadkey}, a typo) would
     # otherwise be sent literally and fail every single tile. Caught here, when
     # it can still be pointed at the field that caused it.
     leftover = re.findall(r"\{[^}]*\}", expand_template(template, 0, 0, 0))
@@ -198,7 +194,7 @@ def validate_template(template: str) -> None:
         raise ValueError(
             f"The tile URL has a placeholder SARMesh cannot fill in: "
             f"{leftover[0]}. Supported placeholders are {known}; anything else "
-            "-- an API key, say -- has to be written out in full."
+            "such as an API key, has to be written out in full."
         )
 
 
@@ -235,11 +231,6 @@ class BasemapDownloader:
     def progress(self) -> DownloadProgress | None:
         with self._lock:
             return self._progress
-
-    @property
-    def running(self) -> bool:
-        progress = self.progress
-        return progress is not None and not progress.finished
 
     def cancel(self) -> None:
         self._cancel.set()
@@ -294,8 +285,6 @@ class BasemapDownloader:
         self._thread.start()
 
         return progress
-
-    ########################## Worker ##########################
 
     def _update(self, **changes: object) -> None:
         with self._lock:
@@ -478,7 +467,7 @@ def _get_tile(
             with urllib.request.urlopen(request, timeout=TIMEOUT_SECONDS) as response:
                 return response.read(), None
         except urllib.error.HTTPError as error:
-            # A 404 is a real answer -- that tile does not exist at this zoom --
+            # A 404 is a real answer, meaning no tile at this zoom, so it is
             # so there is nothing to retry, and it is not worth reporting as a
             # fault: coverage gaps at the edges of an area are normal.
             if error.code == 404:

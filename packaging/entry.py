@@ -2,7 +2,7 @@
 
 A packaged SARMesh is launched by double-clicking, so with no arguments it goes
 straight to the desktop app. Arguments still work when the bundle is started
-from a shortcut or a terminal -- `--basemap` in particular, which is the only
+from a shortcut or a terminal. `--basemap` in particular is the only
 way to load offline tiles until the UI can pick a file itself.
 
 What a packaged build does not have is a console: it is built windowed, so on

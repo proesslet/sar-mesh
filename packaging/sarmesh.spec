@@ -14,7 +14,7 @@ STATIC_DIR = PROJECT_ROOT / "src" / "sarmesh" / "web" / "static"
 
 if not (STATIC_DIR / "index.html").is_file():
     raise SystemExit(
-        "Frontend not built. Run `npm --prefix frontend run build` first -- "
+        "Frontend not built. Run `npm --prefix frontend run build` first, "
         "without it the packaged app would start with no UI to serve."
     )
 
