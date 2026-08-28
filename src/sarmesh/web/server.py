@@ -129,6 +129,7 @@ def create_app(
     downloader: BasemapDownloader | None = None,
 ) -> FastAPI:
     downloads = downloader if downloader is not None else BasemapDownloader()
+
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncGenerator[None, None]:
         # The broadcaster needs the serving loop to hand positions over from
@@ -362,9 +363,7 @@ def create_app(
             tracker_node_id=body.tracker_node_id,
             team_id=body.team_id,
         )
-        logger.info(
-            "Assigned %s to %s", body.tracker_node_id, team.name
-        )
+        logger.info("Assigned %s to %s", body.tracker_node_id, team.name)
 
         payload = asdict(assignment)
         payload["assigned_at"] = assignment.assigned_at.isoformat()

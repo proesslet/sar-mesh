@@ -112,9 +112,7 @@ def tile_bounds(bounds: Bounds, zoom: int) -> tuple[int, int, int, int]:
 
     def y_of(latitude: float) -> int:
         radians = math.radians(latitude)
-        fraction = (
-            1.0 - math.asinh(math.tan(radians)) / math.pi
-        ) / 2.0
+        fraction = (1.0 - math.asinh(math.tan(radians)) / math.pi) / 2.0
         return int(fraction * scale)
 
     limit = scale - 1
@@ -413,7 +411,9 @@ class BasemapDownloader:
             logger.exception("Basemap download failed")
             connection.close()
             partial.unlink(missing_ok=True)
-            self._update(state="failed", completed=completed, failed=failed, error=str(error))
+            self._update(
+                state="failed", completed=completed, failed=failed, error=str(error)
+            )
             return
 
         connection.close()

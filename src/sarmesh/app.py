@@ -10,7 +10,6 @@ from pathlib import Path
 import uvicorn
 
 from sarmesh.core.events import PositionBroadcaster
-from sarmesh.core.registry import TrackerRegistry
 from sarmesh.services.basemaps import BasemapDownloader
 from sarmesh.services.tracking import TrackingService
 from sarmesh.storage.database import Database
@@ -87,9 +86,7 @@ class DesktopApp:
         self.database.initialize()
 
         self.broadcaster = PositionBroadcaster()
-        self.registry = TrackerRegistry()
         self.tracking_service = TrackingService(
-            registry=self.registry,
             database=self.database,
             broadcaster=self.broadcaster,
         )

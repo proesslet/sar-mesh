@@ -1,24 +1,44 @@
+import logging
 import time
+from collections.abc import Callable
 from datetime import UTC, datetime
+from typing import Any
 
 import meshtastic.serial_interface
 import meshtastic.tcp_interface
+from meshtastic.mesh_interface import MeshInterface
 from pubsub import pub
 
 from sarmesh.core.models import TrackerPosition
 
+PositionHandler = Callable[[TrackerPosition], None]
+
+logger = logging.getLogger(__name__)
+
+Packet = dict[str, Any]
+
+POSITION_TOPIC = "meshtastic.receive.position"
+
 
 class MeshtasticTransport:
-    def __init__(self, on_position, host=None, port=None) -> None:
+    def __init__(
+        self,
+        on_position: PositionHandler,
+        host: str | None = None,
+        port: int | None = None,
+    ) -> None:
         self.on_position = on_position
         self.host = host
         self.port = port
-        self.interface = None
+        self.interface: MeshInterface | None = None
+        logger.info("Initializing Meshtastic transport...")
 
     def start(self) -> None:
+        logger.info("Starting Meshtastic transport...")
+
         pub.subscribe(
             self._on_position,
-            "meshtastic.receive.position",
+            POSITION_TOPIC,
         )
 
         if self.host is not None:
@@ -28,10 +48,10 @@ class MeshtasticTransport:
 
         self.interface = interface
 
-        print("Connected.")
+        logger.info("Connected to Meshtastic node: %s", interface.myInfo)
 
-    def _connect_serial(self):
-        print("Connecting to Meshtastic node over serial...")
+    def _connect_serial(self) -> MeshInterface:
+        logger.info("Connecting to Meshtastic node over USB serial...")
 
         interface = meshtastic.serial_interface.SerialInterface()
 
@@ -52,10 +72,10 @@ class MeshtasticTransport:
 
         return interface
 
-    def _connect_tcp(self):
+    def _connect_tcp(self) -> MeshInterface:
         port = self.port or meshtastic.tcp_interface.DEFAULT_TCP_PORT
 
-        print(f"Connecting to Meshtastic node at {self.host}:{port}...")
+        logger.info("Connecting to Meshtastic node at %s:%s...", self.host, port)
 
         try:
             return meshtastic.tcp_interface.TCPInterface(
@@ -63,6 +83,9 @@ class MeshtasticTransport:
                 portNumber=port,
             )
         except OSError as error:
+            logger.error(
+                "Could not reach Meshtastic node at %s:%s: %s", self.host, port, error
+            )
             raise ConnectionError(
                 f"Could not reach Meshtastic node at {self.host}:{port}: {error}"
             ) from error
@@ -74,11 +97,17 @@ class MeshtasticTransport:
             while True:
                 time.sleep(1)
         except KeyboardInterrupt:
-            print("\nShutting down...")
+            logger.info("\nShutting down...")
         finally:
             self.stop()
 
     def stop(self) -> None:
+        pub.unsubscribe(
+            self._on_position,
+            POSITION_TOPIC,
+        )
+        logger.info("Stopping Meshtastic transport...")
+
         if self.interface is None:
             return
 
@@ -90,7 +119,7 @@ class MeshtasticTransport:
 
         self.interface.close()
 
-    def _on_position(self, packet, interface) -> None:
+    def _on_position(self, packet: Packet, interface: MeshInterface) -> None:
         position = (packet.get("decoded") or {}).get("position") or {}
 
         node_id = packet.get("fromId")
@@ -122,7 +151,7 @@ class MeshtasticTransport:
         self.on_position(tracker_position)
 
     @staticmethod
-    def _received_at(packet) -> datetime:
+    def _received_at(packet: Packet) -> datetime:
         # rxTime is the receiving node's clock, which reads 0 until the node
         # syncs time; fall back to local time instead of recording 1970.
         rx_time = packet.get("rxTime")

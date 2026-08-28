@@ -168,14 +168,11 @@ def run(
         help="TCP port for --host (default 4403)",
     ),
 ) -> None:
-    from sarmesh.core.registry import TrackerRegistry
     from sarmesh.services.tracking import TrackingService
     from sarmesh.transports.meshtastic import MeshtasticTransport
 
     database = get_database()
-    registry = TrackerRegistry()
     tracking_service = TrackingService(
-        registry=registry,
         database=database,
     )
 
