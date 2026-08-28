@@ -9,3 +9,11 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 dist/
+
+node_modules/
+
+# Built frontend, produced by `npm run build` in frontend/
+src/sarmesh/web/static/
+
+# PyInstaller work directory
+build/

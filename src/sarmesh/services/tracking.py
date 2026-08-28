@@ -1,3 +1,4 @@
+from sarmesh.core.events import PositionBroadcaster
 from sarmesh.core.models import TrackerPosition
 from sarmesh.core.registry import TrackerRegistry
 from sarmesh.storage.database import Database
@@ -8,9 +9,11 @@ class TrackingService:
         self,
         registry: TrackerRegistry,
         database: Database,
+        broadcaster: PositionBroadcaster | None = None,
     ) -> None:
         self.registry = registry
         self.database = database
+        self.broadcaster = broadcaster
 
     def handle_position(self, position: TrackerPosition) -> None:
         self.registry.update(position)
@@ -26,3 +29,8 @@ class TrackingService:
             position,
             incident_id=incident_id,
         )
+
+        # Persist before broadcasting, so anything the UI is told about is
+        # already durable.
+        if self.broadcaster is not None:
+            self.broadcaster.publish(position)

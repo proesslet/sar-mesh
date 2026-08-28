@@ -1,0 +1,36 @@
+# Builds the Raspberry Pi (arm64) bundle on an x86_64 machine under QEMU.
+#
+# Debian Trixie is not incidental: PySide6's arm64 wheels require glibc 2.39,
+# and Bookworm ships 2.36. Building on Trixie also matches the Pi OS release
+# the resulting bundle is meant to run on.
+FROM debian:trixie
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      ca-certificates \
+      curl \
+      python3 \
+      python3-venv \
+      libegl1 \
+      libgl1 \
+      libxkbcommon0 \
+      libnss3 \
+      libxcomposite1 \
+      libxdamage1 \
+      libxrandr2 \
+      libxcb-cursor0 \
+      libglib2.0-0 \
+      libdbus-1-3 \
+ && rm -rf /var/lib/apt/lists/*
+
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/root/.local/bin:${PATH}"
+
+# Keep the emulated build's virtualenv out of the mounted source tree, or it
+# would collide with the host's x86_64 .venv.
+ENV UV_PROJECT_ENVIRONMENT=/opt/venv
+
+WORKDIR /src
+
+# The frontend is plain JavaScript and is built natively on the host before
+# this runs, so nothing here needs Node.
+CMD ["bash", "-lc", "uv sync --all-groups && uv run python scripts/build_desktop.py --skip-frontend"]

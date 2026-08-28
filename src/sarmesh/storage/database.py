@@ -26,6 +26,12 @@ class Database:
 
     def connect(self) -> sqlite3.Connection:
         if self._connection is None:
+            # sqlite3 creates the file but not a missing parent, and on a
+            # packaged app's first run the user data directory does not exist
+            # yet. Path("sarmesh.db").parent is ".", so this is a no-op when
+            # running from a working directory.
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+
             # Positions are delivered on the Meshtastic "publishing" thread
             # while the main thread owns the CLI, so the connection is shared
             # across threads and serialised by self._lock instead.
@@ -93,7 +99,45 @@ class Database:
                     assigned_at TEXT NOT NULL,
                     unassigned_at TEXT
                 );
+
+                CREATE TABLE IF NOT EXISTS settings (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                );
                 """
+            )
+
+    ########################## Settings ##########################
+
+    def get_setting(self, key: str) -> str | None:
+        with self._transaction() as connection:
+            cursor = connection.execute(
+                """
+                SELECT value FROM settings WHERE key = ?
+                """,
+                (key,),
+            )
+            row = cursor.fetchone()
+            return row[0] if row is not None else None
+
+    def set_setting(self, key: str, value: str | None) -> None:
+        """Store an operator preference, or clear it when value is None."""
+        with self._transaction() as connection:
+            if value is None:
+                connection.execute(
+                    """
+                    DELETE FROM settings WHERE key = ?
+                    """,
+                    (key,),
+                )
+                return
+
+            connection.execute(
+                """
+                INSERT INTO settings (key, value) VALUES (?, ?)
+                ON CONFLICT(key) DO UPDATE SET value = excluded.value
+                """,
+                (key, value),
             )
 
     ########################## Incident Management ##########################
@@ -173,6 +217,18 @@ class Database:
                     ended_at=None,
                 )
             return None
+
+    def update_incident(self, incident_id: str, name: str) -> Incident | None:
+        with self._transaction() as connection:
+            connection.execute(
+                """
+                UPDATE incidents
+                SET name = ?
+                WHERE id = ?
+                """,
+                (name, incident_id),
+            )
+        return self.get_incident(incident_id)
 
     def end_incident(self, incident_id: str, ended_at: datetime) -> None:
         with self._transaction() as connection:
@@ -410,6 +466,26 @@ class Database:
                     unassigned_at=datetime.fromisoformat(row[5]) if row[5] else None,
                 )
                 for row in rows
+            ]
+
+    def get_active_assignments(self) -> list[TrackerAssignment]:
+        """Every assignment still in force, across all incidents."""
+        with self._transaction() as connection:
+            cursor = connection.execute(
+                """
+                SELECT * FROM tracker_assignments
+                WHERE unassigned_at IS NULL ORDER BY assigned_at DESC
+                """
+            )
+            return [
+                TrackerAssignment(
+                    incident_id=row[1],
+                    tracker_node_id=row[2],
+                    team_id=row[3],
+                    assigned_at=datetime.fromisoformat(row[4]),
+                    unassigned_at=None,
+                )
+                for row in cursor.fetchall()
             ]
 
     def unassign_tracker(self, tracker_node_id: str, unassigned_at: datetime) -> None:
