@@ -4,6 +4,11 @@ version = "0.1.0"
 description = "Offline search and rescue personnel tracking over mesh radio networks"
 readme = "README.md"
 requires-python = ">=3.12"
+license = "GPL-3.0-only"
+license-files = ["LICENSE"]
+authors = [
+    {name = "Preston Roesslet", email = "proesslet@gmail.com"},
+]
 dependencies = [
     "fastapi>=0.141.1",
     "meshtastic",

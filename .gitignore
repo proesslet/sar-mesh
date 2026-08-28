@@ -3,7 +3,7 @@ __pycache__/
 *.pyc
 *.py[cod]
 
-*.db
+*.db*
 
 .mypy_cache/
 .pytest_cache/
