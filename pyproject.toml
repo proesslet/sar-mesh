@@ -26,13 +26,15 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/sarmesh"]
-# The built frontend is gitignored, and hatchling excludes VCS-ignored files by
-# default. Without this the wheel installs with no UI to serve.
 artifacts = ["src/sarmesh/web/static/**"]
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "--strict-markers -q"
+filterwarnings = ["error"]
+
 [tool.ruff.lint.flake8-bugbear]
-# typer.Option/Argument return inert marker objects rather than shared mutable
-# defaults, so B008 does not apply to them.
 extend-immutable-calls = ["typer.Option", "typer.Argument"]
 
 [tool.mypy]
@@ -46,6 +48,7 @@ ignore_missing_imports = true
 
 [dependency-groups]
 dev = [
+    "httpx2>=2.12.0",
     "mypy>=2.3.1",
     "pyinstaller>=6.22.2",
     "pytest>=9.1.1",

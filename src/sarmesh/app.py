@@ -14,6 +14,7 @@ from sarmesh.services.basemaps import BasemapDownloader
 from sarmesh.services.tracking import TrackingService
 from sarmesh.storage.database import Database
 from sarmesh.storage.paths import basemap_dir
+from sarmesh.transports import PositionHandler, Transport, TransportFactory
 from sarmesh.transports.meshtastic import MeshtasticTransport
 from sarmesh.web.server import create_app
 from sarmesh.web.tiles import BASEMAP_SETTING, BasemapLibrary
@@ -72,6 +73,7 @@ class DesktopApp:
         radio_host: str | None = None,
         radio_port: int | None = None,
         offline: bool = False,
+        transport_factory: TransportFactory | None = None,
     ) -> None:
         self.host = host
         # None means "prefer the default port, but settle for any free one".
@@ -98,7 +100,12 @@ class DesktopApp:
         self.basemaps.select_default(self.database.settings.get(BASEMAP_SETTING))
 
         self.downloader = BasemapDownloader()
-        self.transport: MeshtasticTransport | None = None
+
+        # Swappable so the incident simulator can feed synthetic positions
+        # through the same path a radio uses. Defaults to the real Meshtastic
+        # transport, which is the only one a packaged build ever builds.
+        self.transport_factory = transport_factory or self._meshtastic
+        self.transport: Transport | None = None
 
         self._api = create_app(
             self.database, self.broadcaster, self.basemaps, self.downloader
@@ -126,12 +133,15 @@ class DesktopApp:
             )
             return _listen(self.host, 0)
 
-    def _start_radio(self) -> None:
-        transport = MeshtasticTransport(
-            on_position=self.tracking_service.handle_position,
+    def _meshtastic(self, on_position: PositionHandler) -> Transport:
+        return MeshtasticTransport(
+            on_position=on_position,
             host=self.radio_host,
             port=self.radio_port,
         )
+
+    def _start_radio(self) -> None:
+        transport = self.transport_factory(self.tracking_service.handle_position)
 
         try:
             transport.start()

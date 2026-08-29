@@ -1,6 +1,5 @@
 import logging
 import time
-from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any
 
@@ -10,8 +9,7 @@ from meshtastic.mesh_interface import MeshInterface
 from pubsub import pub
 
 from sarmesh.core.models import TrackerPosition
-
-PositionHandler = Callable[[TrackerPosition], None]
+from sarmesh.transports import PositionHandler
 
 logger = logging.getLogger(__name__)
 

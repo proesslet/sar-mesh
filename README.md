@@ -1,6 +1,7 @@
 # SARMesh
 
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
+[![Tests](https://github.com/proesslet/sar-mesh/actions/workflows/tests.yml/badge.svg)](https://github.com/proesslet/sar-mesh/actions/workflows/tests.yml)
 [![Build](https://github.com/proesslet/sar-mesh/actions/workflows/build.yml/badge.svg)](https://github.com/proesslet/sar-mesh/actions/workflows/build.yml)
 
 **Offline search and rescue personnel tracking over mesh radio networks.**
