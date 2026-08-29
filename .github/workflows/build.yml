@@ -1,14 +1,16 @@
 name: Build desktop app
 
 # PyInstaller bundles the host's real interpreter and native libraries, so it
-# cannot cross-compile. Running one job per target platform is how a single
-# machine still produces every build: push a tag and collect the artifacts.
+# cannot cross-compile. One job per target platform is how a single machine
+# still produces every build.
+#
+# Pushing a tag builds all three, then creates the GitHub release and attaches
+# them. Manual runs build the same bundles but release nothing.
 
 on:
   push:
     tags: ["v*"]
   workflow_dispatch:
-  pull_request:
 
 jobs:
   build:
@@ -20,16 +22,13 @@ jobs:
         include:
           - name: linux-x86_64
             runner: ubuntu-24.04
-            artifact: sarmesh-linux-x86_64
           - name: windows-x86_64
             runner: windows-2022
-            artifact: sarmesh-windows-x86_64
-          # Native arm64 runners are free for public repositories; on a private
-          # repo they need a paid plan. If this job is unavailable, build the
-          # Pi bundle locally instead with scripts/build_pi.sh (QEMU).
+          # Native arm64 runners are free for public repositories; a private
+          # repo needs a paid plan. Without one, build the Pi bundle locally
+          # with packaging/Dockerfile.arm64 under QEMU.
           - name: linux-arm64
             runner: ubuntu-24.04-arm
-            artifact: sarmesh-linux-arm64
 
     steps:
       - uses: actions/checkout@v4
@@ -61,8 +60,65 @@ jobs:
       - name: Build desktop bundle
         run: uv run python scripts/build_desktop.py
 
+      # Tagged builds are named for the version, manual ones for the commit, so
+      # a downloaded file always says what it came from.
+      - name: Work out the asset name
+        id: asset
+        shell: bash
+        run: |
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            version="${GITHUB_REF_NAME#v}"
+          else
+            version="dev-${GITHUB_SHA::7}"
+          fi
+          echo "name=sarmesh-${version}-${{ matrix.name }}" >> "$GITHUB_OUTPUT"
+
+      # tar rather than the zip that upload-artifact makes, because artifacts
+      # do not preserve the executable bit and the bundle would arrive unable
+      # to run. -C dist gives the archive a single sarmesh/ directory so it
+      # does not unpack over the user's working directory.
+      - name: Package (Linux)
+        if: runner.os == 'Linux'
+        run: tar -C dist -czf "${{ steps.asset.outputs.name }}.tar.gz" sarmesh
+
+      # 7z rather than Compress-Archive, which takes many minutes on a bundle
+      # of this many small files.
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: 7z a -tzip "${{ steps.asset.outputs.name }}.zip" dist/sarmesh
+
       - uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact }}
-          path: dist/sarmesh
+          name: ${{ steps.asset.outputs.name }}
+          path: ${{ steps.asset.outputs.name }}.*
           if-no-files-found: error
+
+  release:
+    name: Release
+    needs: build
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    permissions:
+      # Needed to create the release and upload its assets.
+      contents: write
+
+    steps:
+      # needs: build means every platform succeeded, so a release never goes
+      # out missing one.
+      - uses: actions/download-artifact@v4
+        with:
+          path: assets
+          merge-multiple: true
+
+      - name: Checksums
+        working-directory: assets
+        run: |
+          sha256sum sarmesh-* > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: assets/*
+          generate_release_notes: true
+          fail_on_unmatched_files: true
