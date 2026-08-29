@@ -17,3 +17,6 @@ src/sarmesh/web/static/
 
 # PyInstaller work directory
 build/
+
+# Editor settings are shared; anything else under .vscode is personal
+.vscode/*
