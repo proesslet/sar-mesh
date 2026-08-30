@@ -31,6 +31,8 @@ mesh can serve consecutive operations without the logs running together.
 > arrive over a lossy radio mesh and can be minutes stale or missing entirely.
 > Do not use SARMesh as the only means of tracking personnel in the field.
 
+![Image of the SARMesh application running a simulation](docs/images/simulation-example.png)
+
 ## Requirements
 
 - Python 3.12+ and [uv](https://docs.astral.sh/uv/)
@@ -73,11 +75,11 @@ Run from a source checkout, everything writes to `sarmesh.db` in the working
 directory. A packaged build is launched by double-clicking and cannot rely on
 that, so it uses the per-user data directory:
 
-| Platform | Location |
-| --- | --- |
-| Linux | `$XDG_DATA_HOME/sarmesh/` (default `~/.local/share/sarmesh/`) |
-| macOS | `~/Library/Application Support/SARMesh/` |
-| Windows | `%LOCALAPPDATA%\SARMesh\` |
+| Platform | Location                                                      |
+| -------- | ------------------------------------------------------------- |
+| Linux    | `$XDG_DATA_HOME/sarmesh/` (default `~/.local/share/sarmesh/`) |
+| macOS    | `~/Library/Application Support/SARMesh/`                      |
+| Windows  | `%LOCALAPPDATA%\SARMesh\`                                     |
 
 Set `SARMESH_DB` to override both, which is how you point a build at an incident
 database on removable media. Every command reads it, so the CLI and the app
@@ -85,12 +87,12 @@ always agree on which database they are using.
 
 ## Documentation
 
-| | |
-| --- | --- |
-| [Operations](docs/operations.md) | Running an incident, the CLI, logs, offline basemaps |
-| [Architecture](docs/architecture.md) | Data model, layout, how the layers fit together |
-| [Development](docs/development.md) | Dev setup, the check commands, working on the frontend |
-| [Packaging](docs/packaging.md) | Building the desktop bundle for each platform |
+|                                      |                                                        |
+| ------------------------------------ | ------------------------------------------------------ |
+| [Operations](docs/operations.md)     | Running an incident, the CLI, logs, offline basemaps   |
+| [Architecture](docs/architecture.md) | Data model, layout, how the layers fit together        |
+| [Development](docs/development.md)   | Dev setup, the check commands, working on the frontend |
+| [Packaging](docs/packaging.md)       | Building the desktop bundle for each platform          |
 
 ## Contributing
 
