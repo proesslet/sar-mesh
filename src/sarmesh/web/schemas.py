@@ -246,7 +246,6 @@ class BasemapDownload(BasemapArea):
 
 
 class RadioInfoOut(BaseModel):
-
     model_config = ConfigDict(from_attributes=True)
 
     node_id: str | None

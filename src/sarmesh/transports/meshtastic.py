@@ -163,7 +163,9 @@ class MeshtasticTransport:
                 if metadata is not None
                 else None
             ),
-            firmware_version=metadata.firmware_version if metadata is not None else None,
+            firmware_version=metadata.firmware_version
+            if metadata is not None
+            else None,
             role=(
                 _enum_name(config_pb2.Config.DeviceConfig.Role, metadata.role)
                 if metadata is not None
