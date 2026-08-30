@@ -155,6 +155,9 @@ class DesktopApp:
 
         self.transport = transport
 
+        if isinstance(transport, MeshtasticTransport):
+            self._api.state.radio = transport
+
     def run(self, window: bool = True) -> None:
         try:
             sock = self._bind()
@@ -258,6 +261,9 @@ class DesktopApp:
             self._server.should_exit = True
 
         if self.transport is not None:
+            # Cleared first so an in-flight request cannot reach an interface
+            # that is midway through closing.
+            self._api.state.radio = None
             self.transport.stop()
 
         # Stops a download mid-flight rather than leaving its worker threads

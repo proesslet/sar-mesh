@@ -1,3 +1,14 @@
+export interface RadioInfo {
+  node_id: string | null;
+  node_num: number | null;
+  short_name: string | null;
+  long_name: string | null;
+  hardware: string | null;
+  firmware_version: string | null;
+  role: string | null;
+  node_count: number;
+}
+
 export interface TrackerAssignment {
   incident_id: string;
   incident_name: string | null;

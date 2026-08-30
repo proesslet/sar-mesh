@@ -52,3 +52,24 @@ class TrackerStatus:
     team: Team | None
     position: TrackerPosition | None
     last_seen_at: datetime | None
+
+
+@dataclass
+class RadioInfo:
+    """The attached node's own identity, as the interface already knows it.
+
+    Read from the config the library downloads when it connects, so this costs
+    no airtime and answers even when nothing else is in range. Every field is
+    optional because a node that connected but has not finished its config
+    download reports part of this and nothing else.
+    """
+
+    node_id: str | None
+    node_num: int | None
+    long_name: str | None
+    short_name: str | None
+    hardware: str | None
+    firmware_version: str | None
+    role: str | None
+    # Nodes in the attached node's local database, including itself.
+    node_count: int

@@ -24,6 +24,7 @@ from sarmesh.web.routes import (
     events,
     incidents,
     nodes,
+    radio,
     teams,
     trackers,
     tracks,
@@ -39,6 +40,7 @@ ROUTERS: tuple[APIRouter, ...] = (
     assignments.router,
     events.router,
     nodes.router,
+    radio.router,
     tracks.router,
     basemaps_routes.router,
     diagnostics.router,
@@ -64,6 +66,7 @@ def create_app(
     app.state.broadcaster = broadcaster
     app.state.basemaps = basemaps
     app.state.downloader = downloader if downloader is not None else BasemapDownloader()
+    app.state.radio = None
 
     for router in ROUTERS:
         app.include_router(router)

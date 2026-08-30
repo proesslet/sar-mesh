@@ -242,6 +242,23 @@ class BasemapDownload(BasemapArea):
     url_template: str = Field(min_length=1)
 
 
+########################## Radio ##########################
+
+
+class RadioInfoOut(BaseModel):
+
+    model_config = ConfigDict(from_attributes=True)
+
+    node_id: str | None
+    node_num: int | None
+    long_name: str | None
+    short_name: str | None
+    hardware: str | None
+    firmware_version: str | None
+    role: str | None
+    node_count: int
+
+
 ########################## Diagnostics ##########################
 
 

@@ -11,6 +11,7 @@ from fastapi import Depends, HTTPException, Request
 from sarmesh.core.events import PositionBroadcaster
 from sarmesh.services.basemaps import BasemapDownloader
 from sarmesh.storage.database import Database
+from sarmesh.transports.meshtastic import MeshtasticTransport
 from sarmesh.web.tiles import BasemapLibrary
 
 
@@ -36,6 +37,26 @@ def get_basemaps(request: Request) -> BasemapLibrary | None:
     return library
 
 
+def get_radio(request: Request) -> MeshtasticTransport | None:
+    # None until a radio connects, and again after shutdown clears it.
+    radio: MeshtasticTransport | None = request.app.state.radio
+    return radio
+
+
+def require_radio(
+    radio: Annotated[MeshtasticTransport | None, Depends(get_radio)],
+) -> MeshtasticTransport:
+    """The connected node, 503ing when there is none.
+
+    503 rather than 404: the route exists and will work once a node is
+    plugged in, which is what the UI needs to be told.
+    """
+    if radio is None:
+        raise HTTPException(503, "No Meshtastic node connected")
+
+    return radio
+
+
 def require_basemaps(
     basemaps: Annotated[BasemapLibrary | None, Depends(get_basemaps)],
 ) -> BasemapLibrary:
@@ -57,3 +78,4 @@ Broadcaster = Annotated[PositionBroadcaster, Depends(get_broadcaster)]
 Downloader = Annotated[BasemapDownloader, Depends(get_downloader)]
 OptionalBasemaps = Annotated[BasemapLibrary | None, Depends(get_basemaps)]
 Basemaps = Annotated[BasemapLibrary, Depends(require_basemaps)]
+Radio = Annotated[MeshtasticTransport, Depends(require_radio)]

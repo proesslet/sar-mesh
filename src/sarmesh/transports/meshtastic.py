@@ -6,9 +6,10 @@ from typing import Any
 import meshtastic.serial_interface
 import meshtastic.tcp_interface
 from meshtastic.mesh_interface import MeshInterface
+from meshtastic.protobuf import config_pb2, mesh_pb2
 from pubsub import pub
 
-from sarmesh.core.models import TrackerPosition
+from sarmesh.core.models import RadioInfo, TrackerPosition
 from sarmesh.transports import PositionHandler
 
 logger = logging.getLogger(__name__)
@@ -16,6 +17,25 @@ logger = logging.getLogger(__name__)
 Packet = dict[str, Any]
 
 POSITION_TOPIC = "meshtastic.receive.position"
+
+
+class RadioUnavailable(RuntimeError):
+    """Asked something of the node while no node was connected."""
+
+
+def _enum_name(enum: Any, value: int) -> str:
+    """A protobuf enum's label, falling back to the raw number.
+
+    Firmware newer than the bundled protobufs reports values this library has
+    no name for, and Name() raises on those. A number an operator can look up
+    beats a 500.
+    """
+    try:
+        name: str = enum.Name(value)
+    except ValueError:
+        return str(value)
+
+    return name
 
 
 class MeshtasticTransport:
@@ -47,6 +67,7 @@ class MeshtasticTransport:
         self.interface = interface
 
         logger.info("Connected to Meshtastic node: %s", interface.myInfo)
+        logger.info(interface.getShortName())
 
     def _connect_serial(self) -> MeshInterface:
         logger.info("Connecting to Meshtastic node over USB serial...")
@@ -116,6 +137,42 @@ class MeshtasticTransport:
             return
 
         self.interface.close()
+
+    def node_info(self) -> RadioInfo:
+        """What the attached node says about itself.
+
+        Everything here is served out of the config the library downloaded
+        during start(), so this neither blocks nor puts anything on the air.
+        """
+        interface = self.interface
+
+        if interface is None:
+            raise RadioUnavailable("No Meshtastic node is connected")
+
+        user = interface.getMyUser() or {}
+        metadata = interface.metadata
+        my_info = interface.myInfo
+
+        return RadioInfo(
+            node_id=user.get("id"),
+            node_num=my_info.my_node_num if my_info is not None else None,
+            long_name=user.get("longName"),
+            short_name=user.get("shortName"),
+            hardware=(
+                _enum_name(mesh_pb2.HardwareModel, metadata.hw_model)
+                if metadata is not None
+                else None
+            ),
+            firmware_version=metadata.firmware_version if metadata is not None else None,
+            role=(
+                _enum_name(config_pb2.Config.DeviceConfig.Role, metadata.role)
+                if metadata is not None
+                else None
+            ),
+            # The reader thread adds to this dict as nodes are heard. len() on a
+            # dict being mutated is safe; iterating it would not be.
+            node_count=len(interface.nodes or {}),
+        )
 
     def _on_position(self, packet: Packet, interface: MeshInterface) -> None:
         position = (packet.get("decoded") or {}).get("position") or {}

@@ -7,9 +7,11 @@ import { SettingsAbout } from "./SettingsAbout";
 import { SettingsBasemaps } from "./SettingsBasemaps";
 import { SettingsDiagnostics } from "./SettingsDiagnostics";
 import { SettingsIncident } from "./SettingsIncident";
+import { SettingsRadio } from "./SettingsRadio";
 import styles from "./SettingsModal.module.css";
 
 const CATEGORIES = [
+  { id: "radio", label: "Radio" },
   { id: "incident", label: "Incident" },
   { id: "map", label: "Map" },
   { id: "diagnostics", label: "Diagnostics" },
@@ -156,13 +158,17 @@ function SettingsContent({
   onIncidentChange,
   onSelectArea,
 }: SettingsProps) {
-  const [current, setCurrent] = useState<CategoryId>("incident");
+  const [current, setCurrent] = useState<CategoryId>("radio");
   const { diagnostics, error } = useDiagnostics();
 
   return (
     <Modal open title="Settings" onClose={onClose} size="lg" flush>
       <div className={styles.layout}>
         <SettingsNav current={current} onSelect={setCurrent} />
+
+        <Panel id="radio" current={current}>
+          <SettingsRadio />
+        </Panel>
 
         <Panel id="incident" current={current}>
           <SettingsIncident incident={incident} onChange={onIncidentChange} />

@@ -1,0 +1,33 @@
+.tag {
+  padding: 1px 6px;
+  color: var(--muted);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.details {
+  margin-top: 8px;
+}
+
+.detail {
+  padding: 4px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.detail:last-child {
+  border-bottom: 0;
+}
+
+.label {
+  margin-top: 0;
+}
+
+.value {
+  color: var(--text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  word-break: break-all;
+}

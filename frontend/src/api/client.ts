@@ -8,12 +8,26 @@ import type {
   Incident,
   LogTail,
   MeshNode,
+  RadioInfo,
   Team,
   Track,
   Tracker,
   TrackerStatus,
   UnregisteredNode,
 } from "./types";
+
+/**
+ * A failure the server described, carrying the status alongside the message.
+ */
+export class ApiError extends Error {
+  readonly status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
@@ -22,7 +36,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
 
   if (!response.ok) {
-    throw new Error(await errorMessage(response));
+    throw new ApiError(response.status, await errorMessage(response));
   }
 
   return response.json() as Promise<T>;
@@ -52,6 +66,8 @@ const id = encodeURIComponent;
 
 export const api = {
   status: () => request<TrackerStatus[]>("/api/status"),
+
+  radio: () => request<RadioInfo>("/api/radio"),
 
   // Every node heard on the mesh, including ones no team is carrying.
   nodes: () => request<MeshNode[]>("/api/nodes"),
