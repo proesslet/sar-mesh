@@ -9,18 +9,10 @@ export interface Overview {
   basemap: Basemap | null;
   online: OnlineSource | null;
   error: string | null;
-  /** Re-read the active incident and the tracker roster hanging off it. */
   refreshIncident: () => void;
-  /** Re-read which basemap is serving, after settings changed it. */
   refreshBasemap: () => void;
 }
 
-/**
- * The server-owned state the whole screen is drawn from.
- *
- * Every field is refetched rather than patched from a mutation's response: the
- * server decides what is active, and a dialog that guessed would drift from it.
- */
 export function useOverview(): Overview {
   const [statuses, setStatuses] = useState<TrackerStatus[]>([]);
   const [incident, setIncident] = useState<Incident | null>(null);

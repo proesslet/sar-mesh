@@ -70,4 +70,13 @@ MIGRATIONS: tuple[tuple[str, ...], ...] = (
         ON tracker_assignments (tracker_node_id, unassigned_at)
         """,
     ),
+    (  # 3: the index a track query reads
+        # Migration 2's index leads on node_id, so a query selecting a whole
+        # incident's history cannot seek with it and scans the table instead.
+        # This one leads on incident_id and carries the ordering with it.
+        """
+        CREATE INDEX IF NOT EXISTS ix_positions_incident_node_received
+        ON positions (incident_id, node_id, received_at)
+        """,
+    ),
 )

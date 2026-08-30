@@ -8,12 +8,9 @@
   display: flex;
   flex: 1;
   min-height: 0;
-  /* Containing block for the draw-mode hint that floats over the map. */
   position: relative;
 }
 
-/* Column layout so the tracker list scrolls on its own and the settings
-   button stays pinned to the bottom of the aside. */
 .panel {
   width: 300px;
   flex-shrink: 0;
@@ -45,8 +42,6 @@
   color: var(--text);
 }
 
-/* Sits over the map while an area is being drawn. Leaflet's own controls are
-   at z-index 1000, so this has to clear them to stay readable. */
 .drawHint {
   position: absolute;
   top: 68px;

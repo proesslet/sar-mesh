@@ -10,24 +10,30 @@ import { TrackersModal } from "./features/trackers/TrackersModal";
 import { useLivePositions } from "./hooks/useLivePositions";
 import { useNow } from "./hooks/useNow";
 import { useOverview } from "./hooks/useOverview";
-import { toTrackerViews } from "./lib/trackers";
+import { useHeardNodes } from "./hooks/useHeardNodes";
+import { useTracks } from "./hooks/useTracks";
+import { colourFor, teamColours } from "./lib/colours";
+import { toHeardViews, toTrackerViews } from "./lib/trackers";
+import { mergeTrack, toTrackRuns } from "./lib/tracks";
+import { MapControls } from "./map/MapControls";
 import { MapView } from "./map/MapView";
+import type { NodeTrack } from "./map/tracks";
 import styles from "./App.module.css";
 
-// How often the "last seen" ages recompute. Without a tick they would freeze
-// at whatever they read when the last packet arrived.
 const AGE_TICK_MS = 10_000;
 
-// One dialog at a time: each is a native modal, and stacking two would leave
-// the operator dismissing dialogs to get back to the map.
 type OpenDialog = "trackers" | "teams" | "newIncident" | "settings" | null;
 
 export default function App() {
   const overview = useOverview();
-  const { positions, connection } = useLivePositions();
+  const { positions, tail, connection } = useLivePositions();
   const now = useNow(AGE_TICK_MS);
 
   const [dialog, setDialog] = useState<OpenDialog>(null);
+  const [showTracks, setShowTracks] = useState(true);
+  const [allNodes, setAllNodes] = useState(false);
+  // null is the whole incident; a number narrows to the last that many hours.
+  const [windowHours, setWindowHours] = useState<number | null>(null);
 
   // The area to download tiles over. Drawing it means handing the map back to
   // the operator, so settings closes for the duration and reopens with the
@@ -60,6 +66,48 @@ export default function App() {
     [overview.statuses, positions, now],
   );
 
+  const colours = useMemo(
+    () => teamColours(overview.statuses),
+    [overview.statuses],
+  );
+
+  const { tracks } = useTracks(
+    overview.incident?.id ?? null,
+    windowHours,
+    showTracks,
+    connection,
+  );
+
+  const { nodes } = useHeardNodes(
+    overview.incident?.id ?? null,
+    allNodes,
+    connection,
+  );
+
+  const heard = useMemo(
+    () =>
+      allNodes ? toHeardViews(nodes, overview.statuses, positions, now) : [],
+    [allNodes, nodes, overview.statuses, positions, now],
+  );
+
+  // The fetched history plus whatever has arrived since, split where the mesh
+  // stopped hearing the tracker.
+  const trails = useMemo<NodeTrack[]>(() => {
+    const byNode = new Map(trackers.map((view) => [view.nodeId, view]));
+
+    return tracks.flatMap((track) => {
+      const view = byNode.get(track.node_id);
+      if (!view) return [];
+
+      const points = mergeTrack(track.points, tail[track.node_id] ?? []);
+      const runs = toTrackRuns(points, view.stale);
+
+      return runs.length
+        ? [{ nodeId: track.node_id, colour: colourFor(view, colours), runs }]
+        : [];
+    });
+  }, [tracks, tail, trackers, colours]);
+
   return (
     <div className={styles.app}>
       <Header
@@ -77,7 +125,12 @@ export default function App() {
               Trackers <span>{trackers.length}</span>
             </h2>
 
-            <TrackerList trackers={trackers} error={overview.error} now={now} />
+            <TrackerList
+              trackers={trackers}
+              colours={colours}
+              error={overview.error}
+              now={now}
+            />
 
             {overview.basemap && !overview.basemap.available && (
               <Message>
@@ -94,12 +147,29 @@ export default function App() {
 
         <MapView
           markers={trackers}
+          heard={heard}
+          tracks={trails}
+          colours={colours}
           basemap={overview.basemap}
           online={overview.online}
           drawing={drawing}
           area={area}
           onAreaDrawn={finishDrawing}
         />
+
+        {/* Hidden while drawing: the operator is dragging a box across the map
+            and a panel in the corner is one more thing to catch the cursor. */}
+        {!drawing && (
+          <MapControls
+            allNodes={allNodes}
+            onAllNodes={setAllNodes}
+            showTracks={showTracks}
+            onShowTracks={setShowTracks}
+            windowHours={windowHours}
+            onWindowHours={setWindowHours}
+            truncated={tracks.some((track) => track.truncated)}
+          />
+        )}
 
         {drawing && (
           <div className={styles.drawHint}>

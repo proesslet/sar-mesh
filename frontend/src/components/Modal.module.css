@@ -10,18 +10,14 @@
   background: rgb(0 0 0 / 0.55);
 }
 
-/* Enough for a prompt and its button, and no wider. */
 .sm {
   width: min(440px, calc(100vw - 32px));
 }
 
-/* For a list of records with an action on each row. */
 .md {
   width: min(560px, calc(100vw - 32px));
 }
 
-/* For a dialog with its own navigation beside the content, where the content
-   holds file paths and log output that wrap badly in a narrow column. */
 .lg {
   width: min(760px, calc(100vw - 32px));
 }
@@ -59,18 +55,14 @@
 
 .body {
   padding: 16px;
-  /* The dialog grows with its content until it would run off screen, at which
-     point the body scrolls and the header stays put. */
+
   max-height: calc(100vh - 140px);
   overflow-y: auto;
-  /* The default scrollbar renders light and reads as a rendering fault against
-     the dark panel it sits on. */
+
   scrollbar-width: thin;
   scrollbar-color: var(--border) transparent;
 }
 
-/* Hands the padding and the scrolling to the content, for a body that lays out
-   its own panes -- a rail that has to stay put while only one pane scrolls. */
 .flush {
   padding: 0;
   overflow: hidden;

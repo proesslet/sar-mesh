@@ -1,0 +1,58 @@
+/* Top-right clears Leaflet's zoom buttons at top-left and the draw hint at
+   top-centre. Leaflet's own controls sit at z-index 1000. */
+.controls {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 1100;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  font-size: 13px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.window {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.window label {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.window select {
+  padding: 3px 6px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.window select:disabled {
+  opacity: 0.45;
+}
+
+.note {
+  margin: 0;
+  max-width: 190px;
+  color: var(--muted);
+  font-size: 11px;
+}

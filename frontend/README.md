@@ -39,6 +39,13 @@ do not hardcode hex values outside `index.css`.
 bare `<button>` or `<input>`. Reach for a new primitive when a pattern turns up
 in a third place, not on its first.
 
+**Map colours are literal hex, not tokens.** Leaflet writes a line's colour as
+an SVG presentation attribute, where `var(--token)` does not resolve. The team
+palette therefore lives in `lib/colours.ts`; only the marker shape stays in CSS,
+with the hue passed in as an inline custom property. The palette is validated
+for all-pairs separation against the map background -- trails land wherever the
+teams walk, so any two can end up side by side.
+
 **External URLs are shown, not linked.** The desktop build hosts the UI in a
 bare `QWebEngineView` with no `createWindow` override, so `target="_blank"` does
 nothing and a same-window link navigates the app off its own interface with no

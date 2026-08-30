@@ -32,8 +32,25 @@ uv run sarmesh app --offline
 ```
 
 The UI starts, serves stored data, and skips the Meshtastic connection
-entirely. To exercise the ingest path without a radio, write positions straight
-through the service:
+entirely.
+
+For moving trackers rather than stored ones, the simulator swaps the transport
+for walkers that feed the real ingest path, so what the map draws is what it
+would draw for real nodes:
+
+```bash
+uv run python scripts/simulate_incident.py --seed --browser --http-port 8000
+```
+
+`--seed` creates a demo incident, four teams and their trackers up front;
+without it, assign trackers in the UI and they start beaconing within one
+interval. It writes to `sarmesh-sim.db`, not the real database. `--interval`
+and `--speed` control how fast history accumulates, `--ghosts` adds
+unregistered nodes, and the default 8% packet loss plus terrain blackouts are
+what exercise gaps in a track.
+
+To exercise the ingest path one position at a time, write straight through the
+service:
 
 ```python
 from datetime import UTC, datetime

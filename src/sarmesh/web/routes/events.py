@@ -24,15 +24,12 @@ router = APIRouter(tags=["live"])
 
 @router.get("/api/status")
 def status(database: Db, incident_id: str | None = None) -> list[TrackerStatusOut]:
-    if incident_id is None:
-        incident = database.incidents.active()
+    resolved = views.resolve_incident(database, incident_id)
 
-        if incident is None:
-            return []
+    if resolved is None:
+        return []
 
-        incident_id = incident.id
-
-    return views.list_statuses(database, incident_id)
+    return views.list_statuses(database, resolved)
 
 
 @router.get("/events")

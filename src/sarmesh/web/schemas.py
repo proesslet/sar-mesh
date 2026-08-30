@@ -160,6 +160,53 @@ class TrackerStatusOut(BaseModel):
     last_seen_at: datetime | None
 
 
+class NodeOut(BaseModel):
+    """A node heard on the mesh, in the shape the map draws it.
+
+    A superset of the incident roster: it includes nodes with no tracker record
+    and trackers this search is not using. `team` is set only while the node is
+    assigned to the incident being asked about, because a tracker out on
+    someone else's callout is still worth plotting but is not one of ours and
+    must not be coloured as if it were.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    node_id: str
+    node_num: int
+    # None for a node that has never been registered as a tracker.
+    label: str | None
+    team: TeamBase | None
+    position: PositionOut
+
+
+########################## Tracks ##########################
+
+
+class TrackPointOut(BaseModel):
+    """One fix on a trail: only what the polyline needs to be drawn.
+
+    Deliberately not a PositionOut. Satellite count and signal strength are
+    read one pin at a time, never along a trail, and carrying them would more
+    than double the largest response this API sends.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    latitude: float
+    longitude: float
+    received_at: datetime
+
+
+class TrackOut(BaseModel):
+    node_id: str
+    # Set when older fixes were dropped to fit the limit, so the UI can say the
+    # trail was shortened rather than implying the tracker went unheard before
+    # the point where it starts.
+    truncated: bool
+    points: list[TrackPointOut]
+
+
 ########################## Basemaps ##########################
 
 

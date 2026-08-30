@@ -38,9 +38,6 @@ export function Header({
         <Button onClick={onOpenTrackers}>Trackers</Button>
         <Button onClick={onOpenTeams}>Teams</Button>
 
-        {/* Only one incident can be active -- the newest un-ended one wins --
-            so this is offered only when there is none. Ending the current one
-            is a deliberate act, done under Settings. */}
         {incident === null && (
           <Button onClick={onStartIncident}>Start new incident</Button>
         )}

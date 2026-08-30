@@ -1,9 +1,5 @@
 /**
  * Elapsed time as a short, glanceable label: "45s", "12m", "3h".
- *
- * `now` is passed in rather than read from the clock so callers render from a
- * value that ticks on their own schedule -- reading the clock mid-render makes
- * the output depend on when React happens to re-render.
  */
 export function formatAge(iso: string, now: number): string {
   const seconds = Math.max(0, (now - new Date(iso).getTime()) / 1000);

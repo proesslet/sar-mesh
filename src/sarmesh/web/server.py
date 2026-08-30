@@ -23,8 +23,10 @@ from sarmesh.web.routes import (
     diagnostics,
     events,
     incidents,
+    nodes,
     teams,
     trackers,
+    tracks,
 )
 from sarmesh.web.tiles import BasemapLibrary
 
@@ -36,6 +38,8 @@ ROUTERS: tuple[APIRouter, ...] = (
     trackers.router,
     assignments.router,
     events.router,
+    nodes.router,
+    tracks.router,
     basemaps_routes.router,
     diagnostics.router,
 )

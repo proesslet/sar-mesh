@@ -1,6 +1,6 @@
 """Single-table queries, and the assignment history they depend on."""
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, timedelta, timezone
 
 from conftest import make_position
 
@@ -243,6 +243,153 @@ def test_latest_per_node_breaks_same_second_ties_by_id(database: Database) -> No
 
     assert len(latest) == 1
     assert latest[0].latitude == 2.0
+
+
+def test_latest_per_node_can_be_bounded_by_since(database: Database) -> None:
+    """A laptop reused across searches must not report last month's positions
+    as nodes standing still on this one."""
+    base = datetime(2026, 8, 28, 12, 0, tzinfo=UTC)
+    database.positions.save(
+        make_position("!old", received_at=base - timedelta(days=30)), incident_id=None
+    )
+    database.positions.save(make_position("!now", received_at=base), incident_id=None)
+
+    latest = database.positions.latest_per_node(since=base - timedelta(hours=1))
+
+    assert [position.node_id for position in latest] == ["!now"]
+
+
+########################## Position history ##########################
+
+
+def _save_walk(
+    database: Database,
+    node_id: str,
+    count: int,
+    *,
+    incident_id: str | None = "inc",
+    start: datetime | None = None,
+) -> None:
+    """`count` beacons a minute apart, latitudes counting up from 1."""
+    base = start or datetime(2026, 8, 28, 12, 0, tzinfo=UTC)
+
+    for step in range(count):
+        database.positions.save(
+            make_position(
+                node_id,
+                latitude=float(step + 1),
+                received_at=base + timedelta(minutes=step),
+            ),
+            incident_id=incident_id,
+        )
+
+
+def test_history_groups_positions_by_node(database: Database) -> None:
+    _save_walk(database, "!aaaa", 3)
+    _save_walk(database, "!bbbb", 2)
+
+    tracks = database.positions.history_for_incident("inc")
+
+    assert {node: len(points) for node, points in tracks.items()} == {
+        "!aaaa": 3,
+        "!bbbb": 2,
+    }
+
+
+def test_history_is_oldest_first(database: Database) -> None:
+    """The polyline is drawn in array order, so a reversed track draws the
+    trail backwards from where the tracker actually walked."""
+    _save_walk(database, "!aaaa", 4)
+
+    [*points] = database.positions.history_for_incident("inc")["!aaaa"]
+
+    assert [point.latitude for point in points] == [1.0, 2.0, 3.0, 4.0]
+
+
+def test_history_caps_each_node_separately(database: Database) -> None:
+    """One chatty radio must not crowd the rest of the search out of the
+    answer, which a single overall LIMIT would let it do."""
+    _save_walk(database, "!chatty", 5)
+    _save_walk(database, "!quiet", 5)
+
+    tracks = database.positions.history_for_incident("inc", limit_per_node=2)
+
+    assert {node: len(points) for node, points in tracks.items()} == {
+        "!chatty": 2,
+        "!quiet": 2,
+    }
+
+
+def test_history_keeps_the_newest_fixes_when_capped(database: Database) -> None:
+    """Trimming the old end shortens the trail; trimming the new end would
+    leave the tracker drawn somewhere it has already left."""
+    _save_walk(database, "!aaaa", 5)
+
+    points = database.positions.history_for_incident("inc", limit_per_node=2)["!aaaa"]
+
+    assert [point.latitude for point in points] == [4.0, 5.0]
+
+
+def test_history_breaks_a_same_second_tie_by_id(database: Database) -> None:
+    """rxTime is whole seconds, so the cap boundary would otherwise fall
+    somewhere different on each call."""
+    same_second = datetime(2026, 8, 28, 12, 0, tzinfo=UTC)
+
+    for latitude in (1.0, 2.0, 3.0):
+        database.positions.save(
+            make_position(latitude=latitude, received_at=same_second),
+            incident_id="inc",
+        )
+
+    points = database.positions.history_for_incident("inc", limit_per_node=2)
+
+    assert [point.latitude for point in points["!aabbccdd"]] == [2.0, 3.0]
+
+
+def test_history_excludes_another_incident(database: Database) -> None:
+    _save_walk(database, "!aaaa", 2, incident_id="old")
+    _save_walk(database, "!aaaa", 3, incident_id="current")
+
+    tracks = database.positions.history_for_incident("current")
+
+    assert len(tracks["!aaaa"]) == 3
+
+
+def test_history_excludes_unattributed_positions(database: Database) -> None:
+    """A node beaconing while unassigned is stored with no incident, and has
+    no trail on anyone's search."""
+    _save_walk(database, "!aaaa", 2, incident_id=None)
+
+    assert database.positions.history_for_incident("inc") == {}
+
+
+def test_history_without_a_since_returns_everything(database: Database) -> None:
+    _save_walk(database, "!aaaa", 3)
+
+    assert len(database.positions.history_for_incident("inc")["!aaaa"]) == 3
+
+
+def test_history_since_drops_earlier_fixes(database: Database) -> None:
+    base = datetime(2026, 8, 28, 12, 0, tzinfo=UTC)
+    _save_walk(database, "!aaaa", 5, start=base)
+
+    points = database.positions.history_for_incident(
+        "inc", since=base + timedelta(minutes=3)
+    )["!aaaa"]
+
+    assert [point.latitude for point in points] == [4.0, 5.0]
+
+
+def test_history_since_is_honoured_across_a_non_utc_offset(database: Database) -> None:
+    """Timestamps are compared as text, so a +02:00 bound would sort after the
+    same instant written as UTC and silently drop two hours of the trail."""
+    base = datetime(2026, 8, 28, 12, 0, tzinfo=UTC)
+    _save_walk(database, "!aaaa", 5, start=base)
+
+    shifted = (base + timedelta(minutes=3)).astimezone(timezone(timedelta(hours=2)))
+    points = database.positions.history_for_incident("inc", since=shifted)["!aaaa"]
+
+    assert [point.latitude for point in points] == [4.0, 5.0]
 
 
 ########################## Settings ##########################

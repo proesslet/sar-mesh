@@ -29,10 +29,18 @@ loop via `call_soon_threadsafe`, because `asyncio.Queue` is not thread safe.
 | `TrackerAssignment` | Binds a tracker to a team for an incident, over a time window |
 | `TrackerPosition` | One received beacon: lat/lon, timestamp, sats, precision, RSSI, SNR |
 | `TrackerStatus` | Derived view: a tracker with its team, latest position and last-seen time |
+| `Track` | Derived view: one tracker's positions for an incident, oldest first |
 
 Assignments are historical. Releasing a tracker stamps `unassigned_at` rather
 than deleting the row, so an incident's attribution can be reconstructed
 afterwards.
+
+Positions are append-only and never pruned, so a tracker's whole path is
+already on disk. `/api/status` reads the latest one per tracker and `/api/tracks`
+reads the run of them, capped per node so one fast radio cannot crowd out the
+rest of the search. `/api/nodes` is the wider view: every node heard on the mesh
+around the incident, including ones no team is carrying, which is what an
+operator needs in order to spot a tracker that still wants assigning.
 
 Only one incident is active at a time: the newest un-ended one. Ending an
 incident releases its assignments, otherwise the closed incident would keep

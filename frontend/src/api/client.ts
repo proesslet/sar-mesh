@@ -7,7 +7,9 @@ import type {
   DownloadProgress,
   Incident,
   LogTail,
+  MeshNode,
   Team,
+  Track,
   Tracker,
   TrackerStatus,
   UnregisteredNode,
@@ -50,6 +52,15 @@ const id = encodeURIComponent;
 
 export const api = {
   status: () => request<TrackerStatus[]>("/api/status"),
+
+  // Every node heard on the mesh, including ones no team is carrying.
+  nodes: () => request<MeshNode[]>("/api/nodes"),
+
+  tracks: (since?: Date) =>
+    request<Track[]>(
+      since ? `/api/tracks?since=${id(since.toISOString())}` : "/api/tracks",
+    ),
+
   trackers: () => request<Tracker[]>("/api/trackers"),
   teams: () => request<Team[]>("/api/teams"),
   incidents: () => request<Incident[]>("/api/incidents"),
@@ -68,7 +79,6 @@ export const api = {
       body: JSON.stringify({ name, personnel_count }),
     }),
 
-  // Returns the remaining teams, so the list cannot drift from the server.
   deleteTeam: (teamId: string) =>
     request<Team[]>(`/api/teams/${id(teamId)}`, { method: "DELETE" }),
 
@@ -81,7 +91,6 @@ export const api = {
   unregisteredNodes: () =>
     request<UnregisteredNode[]>("/api/trackers/unregistered"),
 
-  // Returns the remaining trackers, so the list cannot drift from the server.
   deleteTracker: (nodeId: string) =>
     request<Tracker[]>(`/api/trackers/${id(nodeId)}`, { method: "DELETE" }),
 
@@ -91,7 +100,6 @@ export const api = {
       body: JSON.stringify({ incident_id, tracker_node_id, team_id }),
     }),
 
-  // Returns the trackers, whose assignment state is what the caller shows.
   unassign: (nodeId: string) =>
     request<Tracker[]>(`/api/assignments/${id(nodeId)}`, { method: "DELETE" }),
 

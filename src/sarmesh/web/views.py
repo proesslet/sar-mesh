@@ -5,17 +5,43 @@ not fields on any row. Each is a small join, and assembling them here keeps the
 route handlers to validation and the repositories to single-table SQL.
 """
 
+from datetime import datetime, timedelta
+
 from sarmesh.core.models import Team, Tracker
 from sarmesh.storage.database import Database
+from sarmesh.storage.repositories.positions import MAX_TRACK_POINTS
 from sarmesh.web.schemas import (
     AssignmentSummary,
+    NodeOut,
     PositionOut,
     TeamBase,
     TeamOut,
     TrackerBase,
     TrackerOut,
     TrackerStatusOut,
+    TrackOut,
+    TrackPointOut,
 )
+
+# How far before an incident opened a node can have been heard and still count
+# as out there. Generous next to a Meshtastic beacon interval of a few minutes,
+# so a node stays visible while the operator is still filling in the form.
+HEARD_BEFORE_START = timedelta(hours=1)
+
+
+def resolve_incident(database: Database, incident_id: str | None) -> str | None:
+    """The incident a request is about: the one asked for, or the open one.
+
+    Returns None when nothing is running, which every caller renders as an
+    empty answer rather than an error -- a base station with no incident open
+    is a normal state, not a failure.
+    """
+    if incident_id is not None:
+        return incident_id
+
+    incident = database.incidents.active()
+
+    return incident.id if incident else None
 
 
 def assignment_counts(database: Database) -> dict[str, int]:
@@ -101,3 +127,77 @@ def list_statuses(database: Database, incident_id: str) -> list[TrackerStatusOut
         )
 
     return statuses
+
+
+def list_nodes(database: Database, incident_id: str) -> list[NodeOut]:
+    """Every node heard on the mesh around and during this incident.
+
+    Wider than list_statuses on purpose: this is what lets an operator see a
+    node that is beaconing but has not been given to a team yet, which is the
+    thing they need in order to assign it.
+
+    Bounded because positions are never pruned -- a laptop reused across
+    searches would otherwise show months of stale nodes, every one of them
+    looking like somebody standing still. The grace period before the start is
+    what keeps a node that beaconed while the operator was still typing the
+    incident name from being invisible until its next beacon.
+    """
+    incident = database.incidents.get(incident_id)
+
+    if incident is None:
+        return []
+
+    labels = {tracker.node_id: tracker.label for tracker in database.trackers.list()}
+
+    teams: dict[str, TeamBase] = {}
+
+    for assignment in database.assignments.active_for_incident(incident_id):
+        team = database.teams.get(assignment.team_id)
+
+        if team is not None:
+            teams[assignment.tracker_node_id] = TeamBase.model_validate(team)
+
+    return [
+        NodeOut(
+            node_id=position.node_id,
+            node_num=position.node_num,
+            label=labels.get(position.node_id),
+            team=teams.get(position.node_id),
+            position=PositionOut.model_validate(position),
+        )
+        for position in database.positions.latest_per_node(
+            since=incident.started_at - HEARD_BEFORE_START
+        )
+    ]
+
+
+def list_tracks(
+    database: Database,
+    incident_id: str,
+    since: datetime | None = None,
+    limit: int = MAX_TRACK_POINTS,
+) -> list[TrackOut]:
+    """The path each tracker has walked during one incident.
+
+    Restricted to the trackers list_statuses is showing, so the map can never
+    draw a trail belonging to nobody. Positions were stamped with the incident
+    they were recorded under, so a tracker released mid-search keeps the trail
+    it earned rather than losing it retroactively.
+
+    Trackers that have not beaconed are absent rather than present and empty:
+    there is no trail to draw, and an empty one would only be something for the
+    caller to filter out again.
+    """
+    tracks = database.positions.history_for_incident(
+        incident_id, since=since, limit_per_node=limit
+    )
+
+    return [
+        TrackOut(
+            node_id=assignment.tracker_node_id,
+            truncated=len(points) >= limit,
+            points=[TrackPointOut.model_validate(point) for point in points],
+        )
+        for assignment in database.assignments.active_for_incident(incident_id)
+        if (points := tracks.get(assignment.tracker_node_id))
+    ]

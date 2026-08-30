@@ -8,11 +8,9 @@ export interface TrackerAssignment {
 export interface Tracker {
   node_id: string;
   label: string;
-  // Non-null while a team is carrying it, which is what blocks deletion.
   assignment: TrackerAssignment | null;
 }
 
-/** A node heard on the mesh that has no tracker record yet. */
 export interface UnregisteredNode {
   node_id: string;
   node_num: number;
@@ -23,7 +21,6 @@ export interface Team {
   id: string;
   name: string;
   personnel_count: number;
-  // Trackers currently assigned to this team, which is what blocks deletion.
   tracker_count: number;
 }
 
@@ -53,14 +50,42 @@ export interface TrackerStatus {
   last_seen_at: string | null;
 }
 
+/** One fix on a trail: only what the polyline needs. */
+export interface TrackPoint {
+  latitude: number;
+  longitude: number;
+  received_at: string;
+}
+
+export interface Track {
+  node_id: string;
+  // Older fixes were dropped to fit the limit, so the trail starts later than
+  // the window asked for.
+  truncated: boolean;
+  points: TrackPoint[];
+}
+
+/**
+ * A node heard on the mesh, whether or not it is working this incident.
+ *
+ * Named MeshNode because `Node` is a DOM global, and shadowing it in a file
+ * that also touches Leaflet produces errors that read as nonsense.
+ */
+export interface MeshNode {
+  node_id: string;
+  node_num: number;
+  // null for a node that has never been registered as a tracker.
+  label: string | null;
+  team: Team | null;
+  position: Position;
+}
+
 export interface Basemap {
   available: boolean;
   name?: string | null;
   minzoom?: number | null;
   maxzoom?: number | null;
   bounds?: string | null;
-  // Changes whenever the active pack changes. Tile URLs are identical between
-  // packs, so this is what lets the map bypass the browser's tile cache.
   revision: number;
 }
 
@@ -79,11 +104,8 @@ export interface BasemapPack {
 export interface OnlineSource {
   url_template: string;
   enabled: boolean;
-  // False for a source that may be viewed but not bulk-downloaded, so the
-  // download form does not offer a URL the server will reject.
+
   bulk_allowed: boolean;
-  // Set only while the default source is in use; a custom server's attribution
-  // is not ours to guess.
   attribution: string | null;
 }
 
@@ -98,9 +120,8 @@ export interface BasemapLibrary {
 /**
  * A geographic bounding box.
  *
- * Drawn on the map, then handed to the tile downloader. Declared once here so
- * the map and the download form cannot drift apart on field order or naming.
- */
+ * Drawn on the map, then handed to the tile downloader
+ **/
 export interface Area {
   west: number;
   south: number;
@@ -112,8 +133,6 @@ export interface DownloadEstimate {
   tiles: number;
   limit: number;
   within_limit: boolean;
-  // The deepest zoom that would fit, when the request is over the limit.
-  // null when it already fits, or when even the minimum zoom is too much.
   suggested_max_zoom: number | null;
 }
 
@@ -124,8 +143,6 @@ export interface DownloadProgress {
   completed: number;
   failed: number;
   error: string | null;
-  // Why the last tile failed, while it is still running. A source that rejects
-  // every request otherwise looks exactly like a stalled download.
   last_error: string | null;
 }
 
@@ -137,7 +154,6 @@ export interface FileLocation {
 
 export interface Diagnostics {
   frozen: boolean;
-  // "unknown" in a build with no distribution metadata to read.
   version: string;
   data_dir: string;
   database: FileLocation;

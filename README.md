@@ -23,9 +23,9 @@ Each position is stamped with the incident its tracker is assigned to, so one
 mesh can serve consecutive operations without the logs running together.
 
 > **Status: early development.** The ingest pipeline, map UI, incident/team/
-> tracker management and offline basemaps all work end to end. Trackers that
-> stop beaconing are shown as stale, but nothing alerts on it yet, and track
-> history and GPX export are not built.
+> tracker management, offline basemaps and track history all work end to end.
+> Trackers that stop beaconing are shown as stale, but nothing alerts on it
+> yet, and GPX export is not built.
 
 > **This is a situational awareness aid, not a life-safety system.** Positions
 > arrive over a lossy radio mesh and can be minutes stale or missing entirely.

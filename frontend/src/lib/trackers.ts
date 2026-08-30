@@ -1,30 +1,18 @@
-import type { Position, TrackerStatus } from "../api";
+import type { MeshNode, Position, TrackerStatus } from "../api";
 
-// A tracker that has not beaconed in this long is shown as stale. Meshtastic
-// nodes typically beacon every few minutes, so this is several missed cycles
-// rather than a single dropped packet.
 const STALE_AFTER_MS = 10 * 60 * 1000;
 
-/**
- * One tracker as the operator sees it: a known position and whether it is
- * still current. Drawn identically by the map and the sidebar, so it is
- * derived once here rather than twice at each of them.
- */
 export interface TrackerView {
   nodeId: string;
   label: string;
   team: string | null;
+  // Carried alongside the name because colour has to key on something stable:
+  // two teams can be renamed, but their ids do not move.
+  teamId: string | null;
   position: Position;
   stale: boolean;
 }
 
-/**
- * Merge the roster from the server with positions arriving over SSE.
- *
- * Live positions win over the snapshot loaded at startup. A tracker with no
- * position at all is dropped: there is nowhere to draw it and nothing to say
- * about it beyond what the Trackers dialog already shows.
- */
 export function toTrackerViews(
   statuses: TrackerStatus[],
   live: Record<string, Position>,
@@ -40,6 +28,58 @@ export function toTrackerViews(
       nodeId: status.tracker.node_id,
       label: status.tracker.label,
       team: status.team?.name ?? null,
+      teamId: status.team?.id ?? null,
+      position,
+      stale: now - new Date(position.received_at).getTime() > STALE_AFTER_MS,
+    });
+  }
+
+  return views;
+}
+
+/**
+ * Views for nodes heard on the mesh that the incident roster does not cover.
+ *
+ * Returned separately from the roster rather than merged into it: the roster
+ * is what the sidebar counts and what the map frames itself on, and neither
+ * should move because a stranger beaconed.
+ *
+ * A node arriving over SSE that is in neither list still gets a view, which is
+ * what lets one appear without waiting for a refetch.
+ */
+export function toHeardViews(
+  nodes: MeshNode[],
+  statuses: TrackerStatus[],
+  live: Record<string, Position>,
+  now: number,
+): TrackerView[] {
+  const roster = new Set(statuses.map((status) => status.tracker.node_id));
+  const labels = new Map<string, string | null>();
+  const teams = new Map<string, { id: string; name: string } | null>();
+
+  for (const node of nodes) {
+    labels.set(node.node_id, node.label);
+    teams.set(node.node_id, node.team);
+  }
+
+  const heard = new Set([...labels.keys(), ...Object.keys(live)]);
+  const views: TrackerView[] = [];
+
+  for (const nodeId of heard) {
+    if (roster.has(nodeId)) continue;
+
+    const position =
+      live[nodeId] ?? nodes.find((node) => node.node_id === nodeId)?.position;
+
+    if (!position) continue;
+
+    const team = teams.get(nodeId) ?? null;
+
+    views.push({
+      nodeId,
+      label: labels.get(nodeId) ?? nodeId,
+      team: team?.name ?? null,
+      teamId: team?.id ?? null,
       position,
       stale: now - new Date(position.received_at).getTime() > STALE_AFTER_MS,
     });

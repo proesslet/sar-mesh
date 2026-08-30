@@ -24,8 +24,6 @@
   font-size: 13px;
 }
 
-/* Whether positions are still arriving. An operator has to be able to tell
-   "nothing is moving" from "we stopped hearing anything" at a glance. */
 .connection {
   font-size: 12px;
   padding: 3px 10px;

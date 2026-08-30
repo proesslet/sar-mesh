@@ -3,6 +3,22 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Matches the map pin, hollow centre and all. */
+.swatch {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 7px;
+  border-radius: 50%;
+  background: var(--pin);
+  box-shadow: 0 0 0 1px var(--pin);
+  vertical-align: baseline;
+}
+
+.stale .swatch {
+  background: var(--panel);
+}
+
 /* A tracker past its beacon window: the age is the part that has to stand out,
    since it is what tells the operator how long ago the position was true. */
 .stale .age {

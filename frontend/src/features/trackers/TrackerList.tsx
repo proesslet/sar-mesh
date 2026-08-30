@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import {
   ErrorMessage,
   List,
@@ -7,6 +8,7 @@ import {
   Name,
   Row,
 } from "../../components/ui";
+import { colourFor } from "../../lib/colours";
 import { formatAge } from "../../lib/format";
 import type { TrackerView } from "../../lib/trackers";
 import styles from "./TrackerList.module.css";
@@ -14,10 +16,12 @@ import styles from "./TrackerList.module.css";
 /** The live roster in the sidebar: who is out, where, and how long ago. */
 export function TrackerList({
   trackers,
+  colours,
   error,
   now,
 }: {
   trackers: TrackerView[];
+  colours: Map<string, string>;
   error: string | null;
   now: number;
 }) {
@@ -39,7 +43,17 @@ export function TrackerList({
             className={tracker.stale ? styles.stale : undefined}
           >
             <Row>
-              <Name>{tracker.label}</Name>
+              <Name>
+                {/* Same hue the map draws it in, so the list and the map are
+                    read as one thing rather than two. */}
+                <span
+                  className={styles.swatch}
+                  style={
+                    { "--pin": colourFor(tracker, colours) } as CSSProperties
+                  }
+                />
+                {tracker.label}
+              </Name>
               <span className={styles.age}>
                 {formatAge(tracker.position.received_at, now)}
               </span>
