@@ -1,0 +1,37 @@
+.onlineSource {
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px dashed var(--border);
+}
+
+/* A radio or checkbox beside a two-line description of what it selects. */
+.option {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  cursor: pointer;
+}
+
+/* A pack that cannot be read is shown so the operator can see it is there,
+   but there is nothing to select, so it does not offer a pointer. */
+.option.unusable {
+  cursor: default;
+  color: var(--muted);
+}
+
+.optionText {
+  display: flex;
+  flex-direction: column;
+  /* Long pack names must not push the radio button off the row. */
+  min-width: 0;
+}
+
+.optionName {
+  font-weight: 600;
+  word-break: break-all;
+}
+
+.optionMeta {
+  color: var(--muted);
+  font-size: 12px;
+}

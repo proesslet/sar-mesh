@@ -1,0 +1,39 @@
+.map {
+  flex: 1;
+  height: 100%;
+  background: #0d1014;
+}
+
+/* Leaflet paints its own light grey behind the tiles, which shows wherever a
+   pack has no coverage and reads as a broken map rather than an edge. Written
+   as a compound selector so it outranks leaflet.css whatever the bundle order
+   turns out to be. */
+.map:global(.leaflet-container) {
+  background: #0d1014;
+}
+
+/* Marker styled in CSS so no image asset has to resolve at runtime, which is
+   what keeps the map working with no network. */
+.pin {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid #0d1014;
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.pin.stale {
+  background: var(--stale);
+  box-shadow: 0 0 0 2px var(--stale);
+}
+
+/* Leaflet's popup is built by Leaflet rather than by us, and defaults to a
+   light theme. Qualified by the map container -- which is where Leaflet mounts
+   the popup pane -- so this outranks leaflet.css whatever the bundle order
+   turns out to be. Matching its specificity would lose on source order. */
+.map :global(.leaflet-popup-content-wrapper),
+.map :global(.leaflet-popup-tip) {
+  background: var(--panel);
+  color: var(--text);
+}

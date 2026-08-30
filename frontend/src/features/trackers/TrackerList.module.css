@@ -1,0 +1,10 @@
+.age {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* A tracker past its beacon window: the age is the part that has to stand out,
+   since it is what tells the operator how long ago the position was true. */
+.stale .age {
+  color: var(--stale);
+}

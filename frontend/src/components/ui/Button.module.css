@@ -1,0 +1,60 @@
+.button {
+  padding: 7px 12px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.button:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.button.danger:hover:not(:disabled) {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* Stretches to its container, for a button that owns a whole row. */
+.block {
+  display: block;
+  width: 100%;
+  flex-shrink: 0;
+  padding: 9px 12px;
+}
+
+/*
+ * Reads as an inline control rather than a button; these sit on rows beside
+ * a label, where a bordered button would dominate the content next to it.
+ */
+.link {
+  padding: 0;
+  font: inherit;
+  font-size: 12px;
+  color: var(--muted);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.link:hover:not(:disabled) {
+  color: var(--accent);
+}
+
+.link.danger:hover:not(:disabled) {
+  color: var(--danger);
+}
+
+.link:disabled {
+  opacity: 0.4;
+  cursor: default;
+}

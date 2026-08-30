@@ -1,0 +1,64 @@
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  /* Containing block for the draw-mode hint that floats over the map. */
+  position: relative;
+}
+
+/* Column layout so the tracker list scrolls on its own and the settings
+   button stays pinned to the bottom of the aside. */
+.panel {
+  width: 300px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 14px 16px;
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+  min-height: 0;
+}
+
+.panelScroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+.panel h2 {
+  margin: 0 0 12px;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.panel h2 span {
+  color: var(--text);
+}
+
+/* Sits over the map while an area is being drawn. Leaflet's own controls are
+   at z-index 1000, so this has to clear them to stay readable. */
+.drawHint {
+  position: absolute;
+  top: 68px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 14px;
+  font-size: 13px;
+  background: var(--panel);
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+}

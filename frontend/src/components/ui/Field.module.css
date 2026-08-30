@@ -1,0 +1,32 @@
+.field > label {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.field + .field {
+  margin-top: 12px;
+}
+
+/* A horizontal run of controls: an input beside its submit button, a progress
+   bar beside its cancel. Wraps rather than overflowing a narrow dialog. */
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+/* An input sharing a row takes the slack, but never collapses to nothing. */
+.actions
+  > input:not([type="number"]):not([type="checkbox"]):not([type="radio"]) {
+  flex: 1;
+  min-width: 140px;
+}
+
+.actions > progress {
+  flex: 1;
+  min-width: 100px;
+}

@@ -1,0 +1,45 @@
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+}
+
+.header h1 {
+  margin: 0;
+  font-size: 16px;
+  letter-spacing: 0.04em;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.incident {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* Whether positions are still arriving. An operator has to be able to tell
+   "nothing is moving" from "we stopped hearing anything" at a glance. */
+.connection {
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+
+.live {
+  color: var(--ok);
+  border-color: var(--ok);
+}
+
+.lost {
+  color: var(--danger);
+  border-color: var(--danger);
+}

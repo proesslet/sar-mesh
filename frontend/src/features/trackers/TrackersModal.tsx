@@ -1,14 +1,29 @@
 import { useCallback, useEffect, useState } from "react";
-import { Modal } from "./Modal";
-import { api } from "./api";
-import type { Incident, Team, Tracker, UnregisteredNode } from "./api";
+import { api } from "../../api";
+import type { Incident, Team, Tracker, UnregisteredNode } from "../../api";
+import { Modal } from "../../components/Modal";
+import {
+  Actions,
+  Button,
+  ErrorMessage,
+  Field,
+  Form,
+  List,
+  ListItem,
+  Message,
+  Meta,
+  Name,
+  Row,
+  Section,
+  Select,
+  TextInput,
+} from "../../components/ui";
+import { useAsyncAction } from "../../hooks/useAsyncAction";
+import { useNow } from "../../hooks/useNow";
+import { formatAge } from "../../lib/format";
+import styles from "./TrackersModal.module.css";
 
-function age(iso: string): string {
-  const seconds = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
-  if (seconds < 60) return `${Math.floor(seconds)}s ago`;
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-  return `${Math.floor(seconds / 3600)}h ago`;
-}
+const AGE_TICK_MS = 10_000;
 
 /** Assign an unassigned tracker to a team, for the incident under way. */
 function AssignControl({
@@ -20,13 +35,13 @@ function AssignControl({
   nodeId: string;
   teams: Team[];
   disabled: boolean;
-  onAssign: (nodeId: string, teamId: string) => void;
+  onAssign: (teamId: string) => void;
 }) {
   const [teamId, setTeamId] = useState("");
 
   return (
-    <div className="assign">
-      <select
+    <div className={styles.assign}>
+      <Select
         aria-label={`Assign ${nodeId} to a team`}
         value={teamId}
         disabled={disabled}
@@ -38,17 +53,27 @@ function AssignControl({
             {team.name}
           </option>
         ))}
-      </select>
-      <button
-        type="button"
-        className="link"
+      </Select>
+      <Button
+        variant="link"
         disabled={disabled || !teamId}
-        onClick={() => onAssign(nodeId, teamId)}
+        onClick={() => onAssign(teamId)}
       >
         Assign
-      </button>
+      </Button>
     </div>
   );
+}
+
+/** Describes what a tracker is currently committed to, for its meta line. */
+function assignmentSummary(tracker: Tracker): string {
+  const { assignment } = tracker;
+  if (!assignment) return " · Unassigned";
+
+  const team = assignment.team_name ?? "Assigned";
+  return assignment.incident_name
+    ? ` · ${team} · ${assignment.incident_name}`
+    : ` · ${team}`;
 }
 
 export function TrackersModal({
@@ -70,8 +95,8 @@ export function TrackersModal({
   const [heard, setHeard] = useState<UnregisteredNode[]>([]);
   const [nodeId, setNodeId] = useState("");
   const [label, setLabel] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const { busy, error, fail, run } = useAsyncAction();
+  const now = useNow(AGE_TICK_MS);
 
   const load = useCallback(() => {
     Promise.all([api.trackers(), api.unregisteredNodes(), api.teams()])
@@ -80,39 +105,24 @@ export function TrackersModal({
         setHeard(nodes);
         setTeams(teamList);
       })
-      .catch(report);
-  }, []);
+      .catch(fail);
+  }, [fail]);
 
   useEffect(() => {
     if (open) load();
   }, [open, load]);
 
-  function report(cause: unknown) {
-    setError(cause instanceof Error ? cause.message : String(cause));
-  }
-
-  async function run(action: () => Promise<unknown>) {
-    setBusy(true);
-    setError(null);
-
-    try {
-      await action();
-      load();
-      onChanged();
-    } catch (cause) {
-      report(cause);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  function add(id: string, name: string) {
-    run(async () => {
-      await api.createTracker(id.trim(), name.trim());
-      setNodeId("");
-      setLabel("");
-    });
-  }
+  // Every mutation here reshapes the same three lists, and the map and sidebar
+  // read from the same records, so both are refreshed rather than patched.
+  const mutate = useCallback(
+    (action: () => Promise<unknown>, after?: () => void) =>
+      run(action, () => {
+        after?.();
+        load();
+        onChanged();
+      }),
+    [run, load, onChanged],
+  );
 
   if (!open) return null;
 
@@ -120,28 +130,24 @@ export function TrackersModal({
   const trimmedLabel = label.trim();
 
   return (
-    <Modal open={open} title="Trackers" onClose={onClose} className="settings">
-      {error && <p className="error">{error}</p>}
+    <Modal open={open} title="Trackers" onClose={onClose} size="md">
+      <ErrorMessage error={error} />
 
-      <section className="settings-section">
-        <h3>
-          Registered <span className="count">{trackers.length}</span>
-        </h3>
-
+      <Section title="Registered" count={trackers.length}>
         {trackers.length === 0 && (
-          <p className="empty">
+          <Message tone="empty">
             No trackers yet. Add one below to start assigning it to a team.
-          </p>
+          </Message>
         )}
 
-        <ul className="trackers">
+        <List>
           {trackers.map((tracker) => (
-            <li key={tracker.node_id}>
-              <div className="tracker-row">
-                <span className="label">{tracker.label}</span>
-                <button
-                  type="button"
-                  className="link danger"
+            <ListItem key={tracker.node_id}>
+              <Row>
+                <Name>{tracker.label}</Name>
+                <Button
+                  variant="link"
+                  danger
                   // A tracker a team is carrying cannot be deleted: its
                   // positions would stop being attributed to anyone mid-search.
                   disabled={busy || tracker.assignment !== null}
@@ -150,32 +156,27 @@ export function TrackersModal({
                       ? `Assigned to ${tracker.assignment.team_name ?? "a team"}`
                       : "Delete this tracker"
                   }
-                  onClick={() => run(() => api.deleteTracker(tracker.node_id))}
+                  onClick={() =>
+                    mutate(() => api.deleteTracker(tracker.node_id))
+                  }
                 >
                   Delete
-                </button>
-              </div>
-              <div className="meta">
+                </Button>
+              </Row>
+              <Meta>
                 <code>{tracker.node_id}</code>
-                {tracker.assignment
-                  ? ` · ${tracker.assignment.team_name ?? "Assigned"}${
-                      tracker.assignment.incident_name
-                        ? ` · ${tracker.assignment.incident_name}`
-                        : ""
-                    }`
-                  : " · Unassigned"}
-              </div>
+                {assignmentSummary(tracker)}
+              </Meta>
 
               {tracker.assignment ? (
-                <div className="assign">
-                  <button
-                    type="button"
-                    className="link"
+                <div className={styles.assign}>
+                  <Button
+                    variant="link"
                     disabled={busy}
-                    onClick={() => run(() => api.unassign(tracker.node_id))}
+                    onClick={() => mutate(() => api.unassign(tracker.node_id))}
                   >
                     Unassign
-                  </button>
+                  </Button>
                 </div>
               ) : (
                 // Only offered with an incident to assign against and a team
@@ -187,95 +188,100 @@ export function TrackersModal({
                     nodeId={tracker.node_id}
                     teams={teams}
                     disabled={busy}
-                    onAssign={(nodeId, teamId) =>
-                      run(() => api.assign(incident.id, nodeId, teamId))
+                    onAssign={(teamId) =>
+                      mutate(() =>
+                        api.assign(incident.id, tracker.node_id, teamId),
+                      )
                     }
                   />
                 )
               )}
-            </li>
+            </ListItem>
           ))}
-        </ul>
+        </List>
 
         {/* Both are preconditions for assigning, and neither is obvious from
             a row that simply has no control on it. */}
         {trackers.length > 0 && incident === null && (
-          <p className="note">
-            Start an incident to assign trackers to teams.
-          </p>
+          <Message>Start an incident to assign trackers to teams.</Message>
         )}
 
         {trackers.length > 0 && incident !== null && teams.length === 0 && (
-          <p className="note">Add a team before assigning trackers.</p>
+          <Message>Add a team before assigning trackers.</Message>
         )}
-      </section>
+      </Section>
 
-      <section className="settings-section">
-        <h3>Add a tracker</h3>
-
+      <Section title="Add a tracker">
         {heard.length > 0 && (
           <>
-            <p className="note">
+            <Message>
               Heard on the mesh but not registered. Pick one to fill in its ID.
-            </p>
-            <ul className="options">
+            </Message>
+            <List>
               {heard.map((node) => (
-                <li key={node.node_id}>
-                  <div className="tracker-row">
+                <ListItem key={node.node_id}>
+                  <Row>
                     <code>{node.node_id}</code>
-                    <button
-                      type="button"
-                      className="link"
+                    <Button
+                      variant="link"
                       disabled={busy}
                       onClick={() => setNodeId(node.node_id)}
                     >
                       Use
-                    </button>
-                  </div>
-                  <div className="meta">Last heard {age(node.last_seen_at)}</div>
-                </li>
+                    </Button>
+                  </Row>
+                  <Meta>
+                    Last heard {formatAge(node.last_seen_at, now)} ago
+                  </Meta>
+                </ListItem>
               ))}
-            </ul>
+            </List>
           </>
         )}
 
-        <form
-          onSubmit={(event) => {
-            event.preventDefault();
-            if (trimmedId && trimmedLabel) add(nodeId, label);
+        <Form
+          onSubmit={() => {
+            if (!trimmedId || !trimmedLabel) return;
+
+            mutate(
+              () => api.createTracker(trimmedId, trimmedLabel),
+              () => {
+                setNodeId("");
+                setLabel("");
+              },
+            );
           }}
         >
-          <div className="settings-field">
-            <label htmlFor="tracker-node-id">Node ID</label>
-            <input
+          <Field label="Node ID" htmlFor="tracker-node-id">
+            <TextInput
               id="tracker-node-id"
               placeholder="!a1b2c3d4"
               value={nodeId}
               disabled={busy}
+              full
               onChange={(event) => setNodeId(event.target.value)}
             />
-          </div>
+          </Field>
 
-          <div className="settings-field">
-            <label htmlFor="tracker-label">Label</label>
-            <div className="settings-actions">
-              <input
+          <Field label="Label" htmlFor="tracker-label">
+            <Actions>
+              <TextInput
                 id="tracker-label"
                 placeholder="Team 2 radio"
                 value={label}
                 disabled={busy}
                 onChange={(event) => setLabel(event.target.value)}
               />
-              <button
+              <Button
                 type="submit"
                 disabled={busy || !trimmedId || !trimmedLabel}
               >
                 Add
-              </button>
-            </div>
-          </div>
-        </form>
-      </section>
+              </Button>
+            </Actions>
+          </Field>
+        </Form>
+      </Section>
     </Modal>
   );
 }

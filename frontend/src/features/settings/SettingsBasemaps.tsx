@@ -1,21 +1,30 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { SettingsDownload } from "./SettingsDownload";
-import { api, uploadBasemap } from "./api";
+import { api, uploadBasemap } from "../../api";
 import type {
   Area,
   BasemapLibrary,
   BasemapPack,
   OnlineSource,
-} from "./api";
+} from "../../api";
+import {
+  Actions,
+  Button,
+  ErrorMessage,
+  Form,
+  List,
+  ListItem,
+  Message,
+  Section,
+  TextInput,
+} from "../../components/ui";
+import { useAsyncAction } from "../../hooks/useAsyncAction";
+import { cx } from "../../lib/cx";
+import { formatSize } from "../../lib/format";
+import { SettingsDownload } from "./SettingsDownload";
+import styles from "./SettingsBasemaps.module.css";
 
-function size(bytes: number): string {
-  if (bytes >= 1e9) return `${(bytes / 1e9).toFixed(1)} GB`;
-  if (bytes >= 1e6) return `${Math.round(bytes / 1e6)} MB`;
-  if (bytes >= 1e3) return `${Math.round(bytes / 1e3)} kB`;
-  return `${bytes} B`;
-}
-
-function detail(pack: BasemapPack): string {
+/** The one-line summary under a pack's name: what it holds and how big it is. */
+function packDetail(pack: BasemapPack): string {
   if (!pack.readable) return "Not a readable MBTiles pack";
 
   const zooms =
@@ -23,7 +32,7 @@ function detail(pack: BasemapPack): string {
       ? `z${pack.minzoom}-${pack.maxzoom}`
       : null;
 
-  return [pack.title, zooms, size(pack.size_bytes)]
+  return [pack.title, zooms, formatSize(pack.size_bytes)]
     .filter(Boolean)
     .join(" · ");
 }
@@ -54,17 +63,17 @@ function OnlineSourceField({
   }
 
   return (
-    <div className="online-source">
-      <label className="checkbox">
+    <div className={styles.onlineSource}>
+      <label className={styles.option}>
         <input
           type="checkbox"
           checked={source.enabled}
           disabled={disabled}
           onChange={(event) => save(url, event.target.checked)}
         />
-        <span>
-          <span className="label">Show online map</span>
-          <span className="meta">
+        <span className={styles.optionText}>
+          <span className={styles.optionName}>Show online map</span>
+          <span className={styles.optionMeta}>
             Drawn under the offline packs, for finding an area to download.
             Falls away on its own when there is no network.
           </span>
@@ -72,23 +81,23 @@ function OnlineSourceField({
       </label>
 
       {source.enabled && (
-        <form
-          className="settings-actions"
-          onSubmit={(event) => {
-            event.preventDefault();
+        <Form
+          onSubmit={() => {
             if (dirty && url.trim()) save(url, true);
           }}
         >
-          <input
-            aria-label="Online tile URL"
-            value={url}
-            disabled={disabled}
-            onChange={(event) => setUrl(event.target.value)}
-          />
-          <button type="submit" disabled={disabled || !dirty || !url.trim()}>
-            Save
-          </button>
-        </form>
+          <Actions>
+            <TextInput
+              aria-label="Online tile URL"
+              value={url}
+              disabled={disabled}
+              onChange={(event) => setUrl(event.target.value)}
+            />
+            <Button type="submit" disabled={disabled || !dirty || !url.trim()}>
+              Save
+            </Button>
+          </Actions>
+        </Form>
       )}
     </div>
   );
@@ -105,68 +114,53 @@ export function SettingsBasemaps({
   onSelectArea: () => void;
 }) {
   const [library, setLibrary] = useState<BasemapLibrary | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<number | null>(null);
+  const { busy, error, fail, run } = useAsyncAction();
   const fileInput = useRef<HTMLInputElement>(null);
   // Held so an in-flight import can be cancelled; a multi-gigabyte pack is not
   // something an operator should be stuck waiting on.
   const upload = useRef<AbortController | null>(null);
 
   const refresh = useCallback(() => {
-    api.basemaps().then(setLibrary).catch(handleError);
-  }, []);
+    api.basemaps().then(setLibrary).catch(fail);
+  }, [fail]);
 
   useEffect(() => {
     refresh();
     return () => upload.current?.abort();
   }, [refresh]);
 
-  function handleError(cause: unknown) {
-    setError(cause instanceof Error ? cause.message : String(cause));
-  }
-
-  async function select(name: string | null) {
-    setBusy(true);
-    setError(null);
-
-    try {
-      setLibrary(await api.selectBasemap(name));
-      onChange();
-    } catch (cause) {
-      handleError(cause);
-    } finally {
-      setBusy(false);
-    }
+  function select(name: string | null) {
+    run(
+      () => api.selectBasemap(name),
+      (next) => {
+        setLibrary(next);
+        onChange();
+      },
+    );
   }
 
   async function importPack(file: File) {
     const controller = new AbortController();
     upload.current = controller;
-    setBusy(true);
-    setError(null);
     setProgress(0);
 
-    try {
-      setLibrary(await uploadBasemap(file, setProgress, controller.signal));
-    } catch (cause) {
-      handleError(cause);
-    } finally {
-      upload.current = null;
-      setBusy(false);
-      setProgress(null);
-      // Cleared so re-picking the same file after a failure still fires change.
-      if (fileInput.current) fileInput.current.value = "";
-    }
+    await run(
+      () => uploadBasemap(file, setProgress, controller.signal),
+      setLibrary,
+    );
+
+    upload.current = null;
+    setProgress(null);
+    // Cleared so re-picking the same file after a failure still fires change.
+    if (fileInput.current) fileInput.current.value = "";
   }
 
   const packs = library?.packs ?? [];
 
   return (
-    <section className="settings-section">
-      <h3>Offline maps</h3>
-
-      {error && <p className="error">{error}</p>}
+    <Section title="Offline maps">
+      <ErrorMessage error={error} />
 
       {library && (
         <OnlineSourceField
@@ -176,21 +170,23 @@ export function SettingsBasemaps({
             setLibrary(next);
             onChange();
           }}
-          onError={handleError}
+          onError={fail}
         />
       )}
 
       {library && packs.length === 0 && (
-        <p className="empty">
+        <Message tone="empty">
           No map packs imported yet. Add an <code>.mbtiles</code> file below, or
           drop one into {library.directory}.
-        </p>
+        </Message>
       )}
 
-      <ul className="options">
+      <List>
         {packs.map((pack) => (
-          <li key={pack.name}>
-            <label className={pack.readable ? "" : "unusable"}>
+          <ListItem key={pack.name}>
+            <label
+              className={cx(styles.option, !pack.readable && styles.unusable)}
+            >
               <input
                 type="radio"
                 name="basemap"
@@ -200,16 +196,16 @@ export function SettingsBasemaps({
                 disabled={busy || !pack.readable}
                 onChange={() => select(pack.name)}
               />
-              <span>
-                <span className="label">{pack.name}</span>
-                <span className="meta">{detail(pack)}</span>
+              <span className={styles.optionText}>
+                <span className={styles.optionName}>{pack.name}</span>
+                <span className={styles.optionMeta}>{packDetail(pack)}</span>
               </span>
             </label>
-          </li>
+          </ListItem>
         ))}
 
-        <li>
-          <label>
+        <ListItem>
+          <label className={styles.option}>
             <input
               type="radio"
               name="basemap"
@@ -217,15 +213,17 @@ export function SettingsBasemaps({
               disabled={busy}
               onChange={() => select(null)}
             />
-            <span>
-              <span className="label">No basemap</span>
-              <span className="meta">Plot positions on a blank map</span>
+            <span className={styles.optionText}>
+              <span className={styles.optionName}>No basemap</span>
+              <span className={styles.optionMeta}>
+                Plot positions on a blank map
+              </span>
             </span>
           </label>
-        </li>
-      </ul>
+        </ListItem>
+      </List>
 
-      <div className="settings-actions">
+      <Actions>
         <input
           ref={fileInput}
           type="file"
@@ -236,29 +234,25 @@ export function SettingsBasemaps({
             if (file) importPack(file);
           }}
         />
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => fileInput.current?.click()}
-        >
+        <Button disabled={busy} onClick={() => fileInput.current?.click()}>
           Import .mbtiles
-        </button>
+        </Button>
 
         {progress != null && (
           <>
             <progress value={progress} max={1} />
-            <span className="meta">{Math.round(progress * 100)}%</span>
-            <button type="button" onClick={() => upload.current?.abort()}>
-              Cancel
-            </button>
+            <span className={styles.optionMeta}>
+              {Math.round(progress * 100)}%
+            </span>
+            <Button onClick={() => upload.current?.abort()}>Cancel</Button>
           </>
         )}
-      </div>
+      </Actions>
 
-      <p className="note">
+      <Message>
         Packs are stored in {library?.directory ?? "the map directory"}. Tiles
         are served from disk, so the map keeps working with no network.
-      </p>
+      </Message>
 
       <SettingsDownload
         area={area}
@@ -268,6 +262,6 @@ export function SettingsBasemaps({
         onSelectArea={onSelectArea}
         onFinished={refresh}
       />
-    </section>
+    </Section>
   );
 }

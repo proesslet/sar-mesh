@@ -1,0 +1,18 @@
+.section + .section {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+
+.section > h3 {
+  margin: 0 0 10px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+/* The heading is muted; the tally beside it is the part worth reading. */
+.count {
+  color: var(--text);
+}

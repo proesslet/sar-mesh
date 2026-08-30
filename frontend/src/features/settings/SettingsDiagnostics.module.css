@@ -1,0 +1,29 @@
+.location + .location {
+  margin-top: 10px;
+}
+
+.path {
+  display: block;
+  color: var(--accent);
+  font-size: 12px;
+  word-break: break-all;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.log {
+  max-height: 260px;
+  margin: 10px 0 0;
+  padding: 10px;
+  overflow: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--muted);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  /* Log lines are long; scrolling the block beats wrapping every timestamp. */
+  white-space: pre;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}

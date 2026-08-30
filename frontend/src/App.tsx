@@ -1,268 +1,142 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import "./App.css";
-import { api } from "./api";
-import type {
-  Area,
-  Basemap,
-  Incident,
-  OnlineSource,
-  TrackerStatus,
-} from "./api";
-import { MapView } from "./MapView";
-import type { TrackerMarker } from "./MapView";
-import { NewIncidentModal } from "./NewIncidentModal";
-import { SettingsModal } from "./SettingsModal";
-import { TeamsModal } from "./TeamsModal";
-import { TrackersModal } from "./TrackersModal";
-import { useLivePositions } from "./useLivePositions";
+import { useCallback, useMemo, useState } from "react";
+import type { Area } from "./api";
+import { Header } from "./components/Header";
+import { Button, Message } from "./components/ui";
+import { NewIncidentModal } from "./features/incidents/NewIncidentModal";
+import { SettingsModal } from "./features/settings/SettingsModal";
+import { TeamsModal } from "./features/teams/TeamsModal";
+import { TrackerList } from "./features/trackers/TrackerList";
+import { TrackersModal } from "./features/trackers/TrackersModal";
+import { useLivePositions } from "./hooks/useLivePositions";
+import { useNow } from "./hooks/useNow";
+import { useOverview } from "./hooks/useOverview";
+import { toTrackerViews } from "./lib/trackers";
+import { MapView } from "./map/MapView";
+import styles from "./App.module.css";
 
-// A tracker that has not beaconed in this long is shown as stale. Meshtastic
-// nodes typically beacon every few minutes, so this is several missed cycles
-// rather than a single dropped packet.
-const STALE_AFTER_MS = 10 * 60 * 1000;
+// How often the "last seen" ages recompute. Without a tick they would freeze
+// at whatever they read when the last packet arrived.
+const AGE_TICK_MS = 10_000;
 
-function age(iso: string): string {
-  const seconds = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
-  if (seconds < 60) return `${Math.floor(seconds)}s`;
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
-  return `${Math.floor(seconds / 3600)}h`;
-}
+// One dialog at a time: each is a native modal, and stacking two would leave
+// the operator dismissing dialogs to get back to the map.
+type OpenDialog = "trackers" | "teams" | "newIncident" | "settings" | null;
 
 export default function App() {
-  const [statuses, setStatuses] = useState<TrackerStatus[]>([]);
-  const [incident, setIncident] = useState<Incident | null>(null);
-  const [basemap, setBasemap] = useState<Basemap | null>(null);
-  const [online, setOnline] = useState<OnlineSource | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [newIncidentOpen, setNewIncidentOpen] = useState(false);
-  const [trackersOpen, setTrackersOpen] = useState(false);
-  const [teamsOpen, setTeamsOpen] = useState(false);
+  const overview = useOverview();
+  const { positions, connection } = useLivePositions();
+  const now = useNow(AGE_TICK_MS);
+
+  const [dialog, setDialog] = useState<OpenDialog>(null);
+
   // The area to download tiles over. Drawing it means handing the map back to
   // the operator, so settings closes for the duration and reopens with the
-  // result -- the modal would otherwise cover the thing being drawn on.
+  // result -- the dialog would otherwise cover the thing being drawn on.
   const [drawing, setDrawing] = useState(false);
   const [area, setArea] = useState<Area | null>(null);
-  const { positions, connection } = useLivePositions();
-
-  // Re-render on a timer so the "last seen" ages count up even while the mesh
-  // is quiet; without this a stalled tracker would look fresh indefinitely.
-  const [, setTick] = useState(0);
-  useEffect(() => {
-    const timer = setInterval(() => setTick((t) => t + 1), 10_000);
-    return () => clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
-    Promise.all([
-      api.status(),
-      api.activeIncident(),
-      api.basemap(),
-      api.basemaps(),
-    ])
-      .then(([s, i, b, library]) => {
-        setStatuses(s);
-        setIncident(i);
-        setBasemap(b);
-        setOnline(library.online);
-      })
-      .catch((e) => setError(String(e)));
-  }, []);
-
-  // Settings can change either of these underneath us, so both are refetched
-  // rather than patched from the response: the server decides what is active.
-  const refreshBasemap = useCallback(() => {
-    Promise.all([api.basemap(), api.basemaps()])
-      .then(([b, library]) => {
-        setBasemap(b);
-        setOnline(library.online);
-      })
-      .catch((e) => setError(String(e)));
-  }, []);
 
   const startDrawing = useCallback(() => {
-    setSettingsOpen(false);
+    setDialog(null);
     setDrawing(true);
   }, []);
 
-  const finishDrawing = useCallback((drawn: Area) => {
-    setArea(drawn);
+  const stopDrawing = useCallback(() => {
     setDrawing(false);
-    setSettingsOpen(true);
+    setDialog("settings");
   }, []);
 
-  const refreshIncident = useCallback(() => {
-    Promise.all([api.activeIncident(), api.status()])
-      .then(([i, s]) => {
-        setIncident(i);
-        setStatuses(s);
-      })
-      .catch((e) => setError(String(e)));
-  }, []);
+  const finishDrawing = useCallback(
+    (drawn: Area) => {
+      setArea(drawn);
+      stopDrawing();
+    },
+    [stopDrawing],
+  );
 
-  // Live SSE positions win over the snapshot loaded at startup.
-  const markers = useMemo<TrackerMarker[]>(() => {
-    return statuses
-      .map((status) => {
-        const position = positions[status.tracker.node_id] ?? status.position;
-        if (!position) return null;
+  const closeDialog = useCallback(() => setDialog(null), []);
 
-        return {
-          nodeId: status.tracker.node_id,
-          label: status.tracker.label,
-          team: status.team?.name ?? null,
-          position,
-          stale:
-            Date.now() - new Date(position.received_at).getTime() >
-            STALE_AFTER_MS,
-        };
-      })
-      .filter((m): m is TrackerMarker => m !== null);
-  }, [statuses, positions]);
+  const trackers = useMemo(
+    () => toTrackerViews(overview.statuses, positions, now),
+    [overview.statuses, positions, now],
+  );
 
   return (
-    <div className="app">
-      <header className="header">
-        <div>
-          <h1>SARMesh</h1>
-          <span className="incident">
-            {incident ? incident.name : "No active incident"}
-          </span>
-        </div>
+    <div className={styles.app}>
+      <Header
+        incident={overview.incident}
+        connection={connection}
+        onOpenTrackers={() => setDialog("trackers")}
+        onOpenTeams={() => setDialog("teams")}
+        onStartIncident={() => setDialog("newIncident")}
+      />
 
-        <div className="header-actions">
-          {/* Always available: trackers are kit, and kit is added and retired
-              between searches as much as during one. */}
-          <button type="button" onClick={() => setTrackersOpen(true)}>
-            Trackers
-          </button>
-
-          <button type="button" onClick={() => setTeamsOpen(true)}>
-            Teams
-          </button>
-
-          {/* Only one incident can be active -- the newest un-ended one wins --
-              so this is offered only when there is none. Ending the current one
-              is a deliberate act, done under Settings. */}
-          {incident === null && (
-            <button type="button" onClick={() => setNewIncidentOpen(true)}>
-              Start new incident
-            </button>
-          )}
-
-          <span className={`connection ${connection}`}>
-            {connection === "live"
-              ? "Receiving"
-              : connection === "connecting"
-                ? "Connecting"
-                : "Signal lost"}
-          </span>
-        </div>
-      </header>
-
-      <main className="body">
-        <aside className="panel">
-          <div className="panel-scroll">
+      <main className={styles.body}>
+        <aside className={styles.panel}>
+          <div className={styles.panelScroll}>
             <h2>
-              Trackers <span className="count">{markers.length}</span>
+              Trackers <span>{trackers.length}</span>
             </h2>
 
-            {error && <p className="error">{error}</p>}
+            <TrackerList trackers={trackers} error={overview.error} now={now} />
 
-            {!error && markers.length === 0 && (
-              <p className="empty">
-                No tracker positions yet. Assign a tracker to a team for the
-                active incident, then wait for its next beacon.
-              </p>
-            )}
-
-            <ul className="trackers">
-              {markers.map((marker) => (
-                <li key={marker.nodeId} className={marker.stale ? "stale" : ""}>
-                  <div className="tracker-row">
-                    <span className="label">{marker.label}</span>
-                    <span className="age">
-                      {age(marker.position.received_at)}
-                    </span>
-                  </div>
-                  <div className="meta">
-                    {marker.team ?? "Unassigned"}
-                    {marker.position.satellites != null &&
-                      ` · ${marker.position.satellites} sats`}
-                  </div>
-                </li>
-              ))}
-            </ul>
-
-            {basemap && !basemap.available && (
-              <p className="note">
+            {overview.basemap && !overview.basemap.available && (
+              <Message>
                 No offline basemap loaded. Positions still plot correctly; add
                 one under Settings to get terrain.
-              </p>
+              </Message>
             )}
           </div>
 
-          <button
-            type="button"
-            className="settings-button"
-            onClick={() => setSettingsOpen(true)}
-          >
+          <Button block onClick={() => setDialog("settings")}>
             Settings
-          </button>
+          </Button>
         </aside>
 
         <MapView
-          markers={markers}
-          basemap={basemap}
-          online={online}
+          markers={trackers}
+          basemap={overview.basemap}
+          online={overview.online}
           drawing={drawing}
           area={area}
           onAreaDrawn={finishDrawing}
         />
 
         {drawing && (
-          <div className="draw-hint">
+          <div className={styles.drawHint}>
             Drag a box over the area to download.
-            <button
-              type="button"
-              className="link"
-              onClick={() => {
-                setDrawing(false);
-                setSettingsOpen(true);
-              }}
-            >
+            <Button variant="link" onClick={stopDrawing}>
               Cancel
-            </button>
+            </Button>
           </div>
         )}
       </main>
 
       <TrackersModal
-        open={trackersOpen}
-        incident={incident}
-        onClose={() => setTrackersOpen(false)}
-        onChanged={refreshIncident}
+        open={dialog === "trackers"}
+        incident={overview.incident}
+        onClose={closeDialog}
+        onChanged={overview.refreshIncident}
       />
 
       <TeamsModal
-        open={teamsOpen}
-        onClose={() => setTeamsOpen(false)}
-        onChanged={refreshIncident}
+        open={dialog === "teams"}
+        onClose={closeDialog}
+        onChanged={overview.refreshIncident}
       />
 
       <NewIncidentModal
-        open={newIncidentOpen}
-        onClose={() => setNewIncidentOpen(false)}
-        onCreated={refreshIncident}
+        open={dialog === "newIncident"}
+        onClose={closeDialog}
+        onCreated={overview.refreshIncident}
       />
 
       <SettingsModal
-        open={settingsOpen}
-        incident={incident}
+        open={dialog === "settings"}
+        incident={overview.incident}
         area={area}
-        onClose={() => setSettingsOpen(false)}
-        onBasemapChange={refreshBasemap}
-        onIncidentChange={refreshIncident}
+        onClose={closeDialog}
+        onBasemapChange={overview.refreshBasemap}
+        onIncidentChange={overview.refreshIncident}
         onSelectArea={startDrawing}
       />
     </div>

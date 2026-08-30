@@ -206,6 +206,8 @@ class FileLocationOut(BaseModel):
 
 class DiagnosticsOut(BaseModel):
     frozen: bool
+    # "unknown" in a build with no distribution metadata to read.
+    version: str
     data_dir: str
     database: FileLocationOut
     log: FileLocationOut

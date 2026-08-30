@@ -1,0 +1,13 @@
+.message {
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.error {
+  color: var(--danger);
+}
+
+.message code {
+  color: var(--accent);
+}

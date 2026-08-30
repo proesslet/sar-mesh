@@ -1,0 +1,27 @@
+.input {
+  padding: 7px 9px;
+  font: inherit;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.input:disabled {
+  opacity: 0.45;
+}
+
+/* Fills the width of a field that owns its own line. */
+.full {
+  width: 100%;
+}
+
+/* Zoom levels are two digits; a full-width box would misrepresent the input. */
+.number {
+  width: 72px;
+}
+
+.select {
+  padding: 5px 7px;
+  font-size: 12px;
+}

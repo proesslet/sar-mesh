@@ -1,14 +1,7 @@
 import { useEffect, useRef } from "react";
 import type { ReactNode } from "react";
-
-type ModalProps = {
-  open: boolean;
-  title: string;
-  onClose: () => void;
-  children: ReactNode;
-  // Extra class on the dialog, so a caller can size it for its own content.
-  className?: string;
-};
+import { cx } from "../lib/cx";
+import styles from "./Modal.module.css";
 
 // Built on the native <dialog> so focus trapping, Esc-to-close and the inert
 // backdrop come from the platform rather than hand-rolled key handling.
@@ -16,9 +9,23 @@ export function Modal({
   open,
   title,
   onClose,
+  size = "sm",
+  flush,
   children,
-  className,
-}: ModalProps) {
+}: {
+  open: boolean;
+  title: string;
+  onClose: () => void;
+  /** "md" for a list of records, "lg" for content beside its own navigation. */
+  size?: "sm" | "md" | "lg";
+  /**
+   * Drop the body's padding and scrolling, for content that lays out its own
+   * panes. The content is then responsible for scrolling whatever should
+   * scroll, and for its own padding.
+   */
+  flush?: boolean;
+  children: ReactNode;
+}) {
   const ref = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
@@ -32,7 +39,7 @@ export function Modal({
   return (
     <dialog
       ref={ref}
-      className={className ? `modal ${className}` : "modal"}
+      className={cx(styles.modal, styles[size])}
       // Fires for Esc and dialog.close() alike, so parent state stays in sync.
       onClose={onClose}
       // The backdrop is part of the dialog element itself; a click landing on
@@ -41,18 +48,18 @@ export function Modal({
         if (event.target === ref.current) onClose();
       }}
     >
-      <div className="modal-header">
+      <div className={styles.header}>
         <h2>{title}</h2>
         <button
           type="button"
-          className="modal-close"
+          className={styles.close}
           onClick={onClose}
           aria-label="Close"
         >
           ×
         </button>
       </div>
-      <div className="modal-body">{children}</div>
+      <div className={cx(styles.body, flush && styles.flush)}>{children}</div>
     </dialog>
   );
 }

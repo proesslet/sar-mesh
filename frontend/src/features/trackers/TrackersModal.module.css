@@ -1,0 +1,8 @@
+/* The assign row sits under the tracker it belongs to, indented by nothing --
+   the list item's own rule already separates it from the next tracker. */
+.assign {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}

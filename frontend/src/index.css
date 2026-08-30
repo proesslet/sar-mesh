@@ -1,1 +1,40 @@
-/* Global resets live in App.css; this file is intentionally minimal. */
+/*
+ * The only global stylesheet: design tokens and the page reset.
+ *
+ * Everything else lives in a *.module.css beside the component that uses it,
+ * so a class name can never collide with one somewhere else in the app.
+ */
+
+:root {
+  --bg: #12151a;
+  --panel: #1a1f27;
+  --border: #2a323d;
+  --text: #e6eaf0;
+  --muted: #8d99a8;
+  --accent: #4ea1ff;
+  --stale: #e0a33e;
+  --danger: #e05252;
+  --ok: #46c07a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font:
+    14px/1.45 system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+}

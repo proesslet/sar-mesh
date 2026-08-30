@@ -1,0 +1,11 @@
+.download {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px dashed var(--border);
+}
+
+.download h4 {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: var(--text);
+}

@@ -3,6 +3,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 
+from sarmesh import __version__
 from sarmesh.storage.paths import is_frozen, log_path, user_data_dir
 from sarmesh.web.dependencies import Db, OptionalBasemaps
 from sarmesh.web.schemas import DiagnosticsOut, FileLocationOut, LogTailOut
@@ -20,6 +21,7 @@ def diagnostics(database: Db, basemaps: OptionalBasemaps) -> DiagnosticsOut:
     """Where SARMesh is keeping things, for an operator with no console."""
     return DiagnosticsOut(
         frozen=is_frozen(),
+        version=__version__,
         data_dir=str(user_data_dir()),
         database=_file_location(database.path),
         log=_file_location(log_path()),

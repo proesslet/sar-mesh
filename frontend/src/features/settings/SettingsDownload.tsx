@@ -1,6 +1,18 @@
 import { useCallback, useEffect, useState } from "react";
-import { api } from "./api";
-import type { Area, DownloadProgress } from "./api";
+import { api } from "../../api";
+import type { Area, DownloadEstimate, DownloadProgress } from "../../api";
+import {
+  Actions,
+  Button,
+  ErrorMessage,
+  Field,
+  Message,
+  Meta,
+  TextInput,
+} from "../../components/ui";
+import { useAsyncAction } from "../../hooks/useAsyncAction";
+import { formatArea } from "../../lib/format";
+import styles from "./SettingsDownload.module.css";
 
 // Remembered between sessions: a team fetches from the same source every time,
 // and retyping a tile URL in the field is exactly the wrong moment for it.
@@ -8,9 +20,65 @@ const TEMPLATE_KEY = "sarmesh.tileUrlTemplate";
 
 const POLL_MS = 1000;
 
-function coordinates(area: Area): string {
-  const round = (value: number) => value.toFixed(3);
-  return `${round(area.west)}, ${round(area.south)} → ${round(area.east)}, ${round(area.north)}`;
+const DEFAULT_MIN_ZOOM = 10;
+const DEFAULT_MAX_ZOOM = 15;
+
+/** How big the request is, and what to do about it when it is too big. */
+function EstimateNote({
+  estimate,
+  onUseZoom,
+}: {
+  estimate: DownloadEstimate;
+  onUseZoom: (zoom: number) => void;
+}) {
+  const tiles = estimate.tiles.toLocaleString();
+
+  if (estimate.within_limit) return <Meta>{tiles} tiles</Meta>;
+
+  return (
+    <Message tone="error">
+      {tiles} tiles
+      {estimate.suggested_max_zoom != null ? (
+        <>
+          {" — too many. "}
+          <Button
+            variant="link"
+            onClick={() => onUseZoom(estimate.suggested_max_zoom!)}
+          >
+            Use zoom {estimate.suggested_max_zoom}
+          </Button>
+          {", or draw a smaller area."}
+        </>
+      ) : (
+        " — too many, even at the minimum zoom. Draw a smaller area."
+      )}
+    </Message>
+  );
+}
+
+/** What a finished, cancelled or failed download left behind. */
+function DownloadOutcome({ progress }: { progress: DownloadProgress }) {
+  if (progress.state === "failed") {
+    return (
+      <Message tone="error">{progress.error ?? "The download failed"}</Message>
+    );
+  }
+
+  if (progress.state === "cancelled") {
+    return (
+      <Meta>Cancelled after {progress.completed.toLocaleString()} tiles</Meta>
+    );
+  }
+
+  return (
+    <Meta>
+      {progress.name} saved
+      {/* Missing tiles are normal at the edges of a provider's coverage, so
+          this is reported rather than treated as a failure. */}
+      {progress.failed > 0 &&
+        ` — ${progress.failed.toLocaleString()} tiles were unavailable`}
+    </Meta>
+  );
 }
 
 export function SettingsDownload({
@@ -42,13 +110,12 @@ export function SettingsDownload({
     setOffered(suggestedUrl);
     if (template === "") setTemplate(suggestedUrl);
   }
-  const [minZoom, setMinZoom] = useState(10);
-  const [maxZoom, setMaxZoom] = useState(15);
-  const [tiles, setTiles] = useState<number | null>(null);
-  const [overLimit, setOverLimit] = useState(false);
-  const [suggestedZoom, setSuggestedZoom] = useState<number | null>(null);
+
+  const [minZoom, setMinZoom] = useState(DEFAULT_MIN_ZOOM);
+  const [maxZoom, setMaxZoom] = useState(DEFAULT_MAX_ZOOM);
+  const [estimate, setEstimate] = useState<DownloadEstimate | null>(null);
   const [progress, setProgress] = useState<DownloadProgress | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { error, run } = useAsyncAction();
 
   const check = useCallback(() => {
     api
@@ -84,14 +151,11 @@ export function SettingsDownload({
 
     api
       .estimateDownload(area, minZoom, maxZoom)
-      .then((estimate) => {
-        if (cancelled) return;
-        setTiles(estimate.tiles);
-        setOverLimit(!estimate.within_limit);
-        setSuggestedZoom(estimate.suggested_max_zoom);
+      .then((next) => {
+        if (!cancelled) setEstimate(next);
       })
       .catch(() => {
-        if (!cancelled) setTiles(null);
+        if (!cancelled) setEstimate(null);
       });
 
     return () => {
@@ -100,116 +164,93 @@ export function SettingsDownload({
   }, [area, minZoom, maxZoom]);
 
   const running = progress?.state === "running";
+  const ready =
+    area != null &&
+    name.trim() !== "" &&
+    template.trim() !== "" &&
+    estimate?.within_limit !== false;
 
-  async function start() {
+  function start() {
     if (!area) return;
 
-    setError(null);
     localStorage.setItem(TEMPLATE_KEY, template);
 
-    try {
-      // The response is already "running", so the polling effect picks it up.
-      setProgress(
-        await api.startDownload(name.trim(), template.trim(), area, minZoom, maxZoom),
-      );
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
-    }
+    // The response is already "running", so the polling effect picks it up.
+    run(
+      () =>
+        api.startDownload(name.trim(), template.trim(), area, minZoom, maxZoom),
+      setProgress,
+    );
   }
 
-  const ready =
-    area != null && name.trim() !== "" && template.trim() !== "" && !overLimit;
-
   return (
-    <div className="download">
+    <div className={styles.download}>
       <h4>Download an area</h4>
 
-      {error && <p className="error">{error}</p>}
+      <ErrorMessage error={error} />
 
-      <div className="settings-field">
-        <label htmlFor="tile-url">Tile URL</label>
-        <input
+      <Field label="Tile URL" htmlFor="tile-url">
+        <TextInput
           id="tile-url"
           placeholder="https://tiles.example.org/{z}/{x}/{y}.png"
           value={template}
           disabled={running}
+          full
           onChange={(event) => setTemplate(event.target.value)}
         />
-        <p className="note">
+        <Message>
           Your own tile server, or a provider whose terms allow bulk download.
           The OpenStreetMap public tile servers do not.
-        </p>
-      </div>
+        </Message>
+      </Field>
 
-      <div className="settings-field">
-        <label htmlFor="pack-name">Pack name</label>
-        <input
+      <Field label="Pack name" htmlFor="pack-name">
+        <TextInput
           id="pack-name"
           placeholder="ridge-search"
           value={name}
           disabled={running}
+          full
           onChange={(event) => setName(event.target.value)}
         />
-      </div>
+      </Field>
 
-      <div className="settings-field">
-        <label>Area</label>
-        <div className="settings-actions">
-          <span className="meta">
-            {area ? coordinates(area) : "No area selected"}
-          </span>
-          <button type="button" disabled={running} onClick={onSelectArea}>
+      <Field label="Area">
+        <Actions>
+          <Meta>{area ? formatArea(area) : "No area selected"}</Meta>
+          <Button disabled={running} onClick={onSelectArea}>
             {area ? "Redraw on map" : "Select on map"}
-          </button>
-        </div>
-      </div>
+          </Button>
+        </Actions>
+      </Field>
 
-      <div className="settings-field">
-        <label>Zoom range</label>
-        <div className="settings-actions">
-          <input
+      <Field label="Zoom range">
+        <Actions>
+          <TextInput
             type="number"
+            aria-label="Minimum zoom"
             min={0}
             max={22}
             value={minZoom}
             disabled={running}
             onChange={(event) => setMinZoom(Number(event.target.value))}
           />
-          <span className="meta">to</span>
-          <input
+          <Meta>to</Meta>
+          <TextInput
             type="number"
+            aria-label="Maximum zoom"
             min={0}
             max={22}
             value={maxZoom}
             disabled={running}
             onChange={(event) => setMaxZoom(Number(event.target.value))}
           />
-        </div>
-      </div>
+        </Actions>
+      </Field>
 
-      {tiles != null && (
-        <p className={overLimit ? "error" : "meta"}>
-          {tiles.toLocaleString()} tiles
-          {overLimit &&
-            (suggestedZoom != null ? (
-              <>
-                {" — too many. "}
-                <button
-                  type="button"
-                  className="link"
-                  onClick={() => setMaxZoom(suggestedZoom)}
-                >
-                  Use zoom {suggestedZoom}
-                </button>
-                {", or draw a smaller area."}
-              </>
-            ) : (
-              " — too many, even at the minimum zoom. Draw a smaller area."
-            ))}
-        </p>
-      )}
+      {estimate && <EstimateNote estimate={estimate} onUseZoom={setMaxZoom} />}
 
-      <div className="settings-actions">
+      <Actions>
         {running ? (
           <>
             {/* Attempted, not fetched: a source that rejects everything would
@@ -218,47 +259,33 @@ export function SettingsDownload({
               value={progress.completed + progress.failed}
               max={progress.total}
             />
-            <span className="meta">
+            <Meta>
               {(progress.completed + progress.failed).toLocaleString()} /{" "}
               {progress.total.toLocaleString()}
-            </span>
-            <button type="button" onClick={() => api.cancelDownload()}>
+            </Meta>
+            <Button
+              onClick={() => run(() => api.cancelDownload(), setProgress)}
+            >
               Cancel
-            </button>
+            </Button>
           </>
         ) : (
-          <button type="button" disabled={!ready} onClick={start}>
+          <Button disabled={!ready} onClick={start}>
             Download
-          </button>
+          </Button>
         )}
-      </div>
+      </Actions>
 
       {/* Shown live rather than saved for the post-mortem: if every tile is
           being refused, that is worth knowing at tile 20, not at tile 5,000. */}
       {running && progress.failed > 0 && (
-        <p className="error">
+        <Message tone="error">
           {progress.failed.toLocaleString()} failed
           {progress.last_error && ` — ${progress.last_error}`}
-        </p>
+        </Message>
       )}
 
-      {progress && !running && progress.state !== "done" && (
-        <p className={progress.state === "failed" ? "error" : "meta"}>
-          {progress.state === "failed"
-            ? (progress.error ?? "The download failed")
-            : `Cancelled after ${progress.completed.toLocaleString()} tiles`}
-        </p>
-      )}
-
-      {progress?.state === "done" && (
-        <p className="meta">
-          {progress.name} saved
-          {/* Missing tiles are normal at the edges of a provider's coverage,
-              so this is reported rather than treated as a failure. */}
-          {progress.failed > 0 &&
-            ` — ${progress.failed.toLocaleString()} tiles were unavailable`}
-        </p>
-      )}
+      {progress && !running && <DownloadOutcome progress={progress} />}
     </div>
   );
 }

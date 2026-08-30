@@ -1,0 +1,43 @@
+.tagline {
+  margin: 0 0 12px;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.version {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  font-weight: 400;
+}
+
+/* The GPL asks an interactive program to carry this notice where the operator
+   can find it. Set apart from the surrounding prose so it reads as the legal
+   statement it is rather than as more description. */
+.notice {
+  margin: 0;
+  padding: 10px 12px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-left: 2px solid var(--accent);
+  border-radius: 6px;
+}
+
+.notice strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.url {
+  display: block;
+  color: var(--accent);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.credit + .credit {
+  margin-top: 8px;
+}

@@ -1,0 +1,40 @@
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.item {
+  padding: 9px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.item:last-child {
+  border-bottom: 0;
+}
+
+/* A name on the left, its action or timestamp on the right. */
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.name {
+  font-weight: 600;
+}
+
+.meta {
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+/* Node ids are hex and dense; the surrounding text is proportional, so they
+   need a monospace face to stay scannable down a column. */
+.meta code,
+.row code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+}
